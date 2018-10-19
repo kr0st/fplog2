@@ -5,19 +5,28 @@
 
 #include "fplog_exceptions.h"
 
+#ifdef _WIN32
+
 #ifdef SPROT_EXPORT
 #define SPROT_API __declspec(dllexport)
 #else
 #define SPROT_API __declspec(dllimport)
 #endif
 
-#ifdef _LINUX
+#endif
+
+#ifdef __linux__
 #define SPROT_API 
 #endif
 
+#ifdef __APPLE__
+#define SPROT_API
+#endif
+
+
 namespace fplog {
 
-class Transport_Interface
+class SPROT_API Transport_Interface
 {
     public:
 
@@ -41,40 +50,6 @@ class Transport_Factory
     public:
 
         virtual Transport_Interface* create(const Transport_Interface::Params& params) = 0;
-};
-
-struct SPROT_API UID
-{
-    UID(): high(0), low(0) {}
-    bool operator== (const UID& rhs) const { return ((high == rhs.high) && (low == rhs.low)); }
-    bool operator< (const UID& rhs) const
-    {
-        if (*this == rhs)
-            return false;
-
-        if (high < rhs.high)
-            return true;
-
-        if (high == rhs.high)
-            return (low < rhs.low);
-
-        return false;
-    }
-
-    std::string to_string(UID& uid)
-    {
-        return (std::to_string(uid.high) + "_" + std::to_string(uid.low));
-    }
-
-    UID from_string(const std::string& str);
-
-    unsigned long long high;
-    unsigned long long low;
-    
-    struct SPROT_API Helper
-    {
-        static UID from_string(const std::string& str);
-    };
 };
 
 };
