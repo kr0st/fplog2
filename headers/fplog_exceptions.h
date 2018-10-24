@@ -6,7 +6,7 @@
 
 #ifndef __SHORT_FORM_OF_FILE__
 
-#ifdef WIN32
+#ifdef _WIN32
 #define __SHORT_FORM_OF_FILE_WIN__ \
     (strrchr(__FILE__,'\\') \
     ? strrchr(__FILE__,'\\')+1 \
@@ -27,7 +27,7 @@
 #define THROW(exception_type) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__); }
 #define THROWM(exception_type, message) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, message); }
 
-#ifdef _LINUX
+#ifdef __linux__
 #define NO_ITOA
 #endif
 
@@ -36,7 +36,9 @@
 #endif
 
 #ifdef NO_ITOA
-inline char *itoa(long i, char* s, int dummy_radix) {
+inline char *itoa(long i, char* s, int dummy_radix)
+{
+    dummy_radix /= 1;
     sprintf(s, "%ld", i);
     return s;
 }
@@ -169,16 +171,6 @@ public:
         Generic_Exception(facility, file, line, message)
     {
     }
-};
-
-class Invalid_Uid: public Generic_Exception
-{
-    public:
-
-        Invalid_Uid(const char* facility, const char* file = "", int line = 0, const char* message = "Supplied fplog::UID is invalid."):
-        Generic_Exception(facility, file, line, message)
-        {
-        }
 };
 
 }};
