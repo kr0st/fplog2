@@ -7,6 +7,7 @@
 #include <chrono>
 #include <iostream>
 
+#define CRC16 0x8005
 using namespace std::chrono;
 
 #ifdef _WIN32
@@ -47,7 +48,7 @@ static unsigned long long get_msec_time_impl()
 
 static int get_system_timezone_impl()
 {
-    FILE* tz = 0;
+    FILE* tz = nullptr;
 
     #ifdef _OSX
 	char cmd[] = "gdate +%:z";
@@ -60,7 +61,7 @@ static int get_system_timezone_impl()
 
     tz = popen(cmd, "r");
         
-    if (tz != 0)
+    if (tz != nullptr)
     {
         if (fgets(line, 256, tz))
         {
@@ -113,7 +114,7 @@ static unsigned long long get_msec_time_impl()
 
 static bool prevent_suicide = false;
 static std::recursive_mutex suicide_mutex;
-static std::thread* suicide_thread = 0;
+static std::thread* suicide_thread = nullptr;
 
 void cause_of_death(size_t timeout)
 {
@@ -155,6 +156,58 @@ void cause_of_death(size_t timeout)
 
 namespace generic_util
 {
+
+uint16_t gen_crc16(const uint8_t *data, uint16_t size)
+{
+    uint16_t out = 0;
+    int bits_read = 0, bit_flag;
+
+    /* Sanity check: */
+    if(data == NULL)
+        return 0;
+
+    while(size > 0)
+    {
+        bit_flag = out >> 15;
+
+        /* Get next bit: */
+        out <<= 1;
+        out |= (*data >> bits_read) & 1; // item a) work from the least significant bits
+
+        /* Increment bit counter: */
+        bits_read++;
+        if(bits_read > 7)
+        {
+            bits_read = 0;
+            data++;
+            size--;
+        }
+
+        /* Cycle check: */
+        if(bit_flag)
+            out ^= CRC16;
+
+    }
+
+    // item b) "push out" the last 16 bits
+    int i;
+    for (i = 0; i < 16; ++i) {
+        bit_flag = out >> 15;
+        out <<= 1;
+        if(bit_flag)
+            out ^= CRC16;
+    }
+
+    // item c) reverse the bits
+    uint16_t crc = 0;
+    i = 0x8000;
+    int j = 0x0001;
+    for (; i != 0; i >>=1, j <<= 1) {
+        if (i & out) crc |= j;
+    }
+
+    return crc;
+}
 
 std::string& remove_json_field(const char* field_name, std::string& source)
 {
@@ -223,7 +276,7 @@ void suicide_prevention()
     suicide_thread->join();
     
     delete suicide_thread;
-    suicide_thread = 0;
+    suicide_thread = nullptr;
     
     prevent_suicide = false;
 }
@@ -475,7 +528,7 @@ size_t base64_decode(const char* source, void* dest, size_t targetlen)
 
     /* concatinate '===' to the source to handle unpadded base64 data */
     src = (char *)malloc(strlen(source)+5);
-    if (src == NULL)
+    if (src == nullptr)
         return -1;
     
     strcpy(src, source);

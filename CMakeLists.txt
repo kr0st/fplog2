@@ -6,4 +6,5 @@ project(fplog2-test)
 include_directories(dependencies/include
 headers)
 
-add_executable(${PROJECT_NAME} "sources/main.cpp")
+add_executable(${PROJECT_NAME} "sources/main.cpp"
+"sources/utils.cpp")
