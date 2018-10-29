@@ -50,7 +50,7 @@ static int get_system_timezone_impl()
 {
     FILE* tz = nullptr;
 
-    #ifdef _OSX
+    #ifdef __APPLE__
 	char cmd[] = "gdate +%:z";
     #else
 	char cmd[] = "date +%:z";
@@ -163,7 +163,7 @@ uint16_t gen_crc16(const uint8_t *data, uint16_t size)
     int bits_read = 0, bit_flag;
 
     /* Sanity check: */
-    if(data == NULL)
+    if(data == nullptr)
         return 0;
 
     while(size > 0)
