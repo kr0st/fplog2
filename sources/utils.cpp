@@ -571,5 +571,21 @@ size_t base64_decode(const char* source, void* dest, size_t targetlen)
 
 size_t base64_encoded_length(size_t non_encoded_length) { return (non_encoded_length+2)/3*4 + 1; }
 
+std::vector<std::string> tokenize(const char *str, char c)
+{
+    std::vector<std::string> result;
+
+    do
+    {
+        const char *begin = str;
+
+        while(*str != c && *str)
+            str++;
+
+        result.push_back(std::string(begin, str));
+    } while (0 != *str++);
+
+    return result;
+}
 
 };

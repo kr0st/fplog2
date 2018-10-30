@@ -6,6 +6,7 @@
 #include <cctype>
 #include <locale>
 #include <algorithm>
+#include <vector>
 
 namespace generic_util
 {
@@ -54,5 +55,7 @@ static inline std::string &rtrim(std::string &s) {
 static inline std::string &trim(std::string &s) {
         return ltrim(rtrim(s));
 }
+
+std::vector<std::string> tokenize(const char *str, char c = ' ');
 
 };
