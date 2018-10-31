@@ -9,7 +9,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <netdb.h> 
+#include <netdb.h>
+#include <unistd.h>
 
 #define SOCKET int
 #define SD_BOTH SHUT_RDWR
@@ -47,6 +48,7 @@ class Udp_Transport: public sprot::Basic_Transport_Interface
         bool connected_;
         std::recursive_mutex mutex_;
         unsigned char ip_[4];
+        unsigned short port_;
         bool localhost_;
 };
 

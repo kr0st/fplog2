@@ -83,19 +83,34 @@ void Udp_Transport::connect(const Session_Manager::Params& params)
         localhost_ = false;
     }
 
+    std::string port;
+
+    if (params.find("port") != params.end())
+    {
+        port = params.find("port")->second;
+    }
+
+    if (params.find("PORT") != params.end())
+    {
+        port = params.find("PORT")->second;
+    }
+
     const unsigned char localhost[4] = {127, 0, 0, 1};
     if (memcmp(ip_, localhost, sizeof(localhost)) == 0)
         localhost_ = true;
 
-    fplog::UID uid;
-    uid.from_string(uidstr);
+    unsigned short iport = 0;
 
-    if ((uid.high > 65535) || (uid.high < 1))
-        THROW(fplog::exceptions::Invalid_Uid);
+    try
+    {
+        iport = static_cast<unsigned short>(std::stoi(port));
+    }
+    catch(std::exception&)
+    {
+        THROW(fplog::exceptions::Incorrect_Parameter);
+    }
 
-    if ((uid.low > 65535) || (uid.low < 1))
-        THROW(fplog::exceptions::Invalid_Uid);
-
+    port_ = iport;
     disconnect();
 
     socket_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -103,7 +118,7 @@ void Udp_Transport::connect(const Session_Manager::Params& params)
     {
         std::string error;
 
-        #ifndef _LINUX
+        #ifdef _WIN32
 
         error += ("Connect failed, socket error = " + std::to_string(WSAGetLastError()));
 
@@ -118,7 +133,7 @@ void Udp_Transport::connect(const Session_Manager::Params& params)
 
     sockaddr_in listen_addr;
     listen_addr.sin_family=AF_INET;
-    listen_addr.sin_port=htons((u_short)uid.high);
+    listen_addr.sin_port=htons(iport);
 
     if (localhost_)
     {
@@ -159,18 +174,9 @@ void Udp_Transport::connect(const Session_Manager::Params& params)
             THROW(fplog::exceptions::Connect_Failed);
         }
 
-        listen_addr.sin_port=htons((u_short)uid.low);
-        if (0 != bind(socket_, (sockaddr*)&listen_addr, sizeof(listen_addr)))
-        {
-            shutdown(socket_, SD_BOTH);
-            closesocket(socket_);
-            THROW(fplog::exceptions::Connect_Failed);
-        }
+        THROW(fplog::exceptions::Connect_Failed);
     }
-    else
-        high_uid_ = true;
 
-    uid_ = uid;
     connected_ = true;
 }
 
@@ -184,7 +190,7 @@ void Udp_Transport::disconnect()
     int res = 0;
     if (SOCKET_ERROR == shutdown(socket_, SD_BOTH))
     {
-        #ifndef _LINUX
+        #ifdef _WIN32
 
         res = WSAGetLastError();
 
@@ -199,7 +205,7 @@ void Udp_Transport::disconnect()
 
     if (SOCKET_ERROR == closesocket(socket_))
     {
-        #ifndef _LINUX
+        #ifdef _WIN32
 
         res = WSAGetLastError();
 
@@ -263,7 +269,7 @@ retry:
     if (res != 1)
         THROW(fplog::exceptions::Read_Failed);
 
-#ifdef _OSX
+#ifdef __APPLE__
     res = recvfrom((int)socket_, buf, buf_size, 0, (sockaddr*)&remote_addr, (socklen_t *)&addr_len);
 #else
     res = recvfrom(socket_, (char*)buf, static_cast<int>(buf_size), 0, (sockaddr*)&remote_addr, &addr_len);
@@ -272,9 +278,6 @@ retry:
     if (res != SOCKET_ERROR)
     {
         remote_addr.sin_port = ntohs(remote_addr.sin_port);
-
-        if ((remote_addr.sin_port != uid_.high) && (remote_addr.sin_port != uid_.low))
-            goto retry;
 
         if (!localhost_)
             if (memcmp(&(remote_addr.sin_addr.s_addr), ip_, sizeof(ip_)) != 0)
@@ -358,8 +361,7 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout)
 }
 
 Udp_Transport::Udp_Transport():
-connected_(false),
-high_uid_(false)
+connected_(false)
 {
 }
 
