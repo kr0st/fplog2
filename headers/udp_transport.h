@@ -28,15 +28,21 @@
 
 namespace sprot {
 
-class Udp_Transport: public sprot::Basic_Transport_Interface
+class Udp_Transport: public sprot::Extended_Transport_Interface
 {
     public:
 
-        void connect(const Session_Manager::Params& params);
-        void disconnect();
+        union Ip_Address
+        {
+            unsigned char bytes[4];
+            unsigned int ip;
+        };
 
-        virtual size_t read(void* buf, size_t buf_size, size_t timeout = infinite_wait);
-        virtual size_t write(const void* buf, size_t buf_size, size_t timeout = infinite_wait);
+        void enable(const Session_Manager::Params& params);
+        void disable();
+
+        virtual size_t read(void* buf, size_t buf_size, size_t timeout = infinite_wait, Extended_Data& user_data = no_extended_data);
+        virtual size_t write(const void* buf, size_t buf_size, size_t timeout = infinite_wait, Extended_Data& user_data = no_extended_data);
 
         Udp_Transport();
         virtual ~Udp_Transport();
@@ -45,10 +51,14 @@ class Udp_Transport: public sprot::Basic_Transport_Interface
     private:
 
         SOCKET socket_;
-        bool connected_;
-        std::recursive_mutex mutex_;
+        bool enabled_;
+
+        std::recursive_mutex read_mutex_;
+        std::recursive_mutex write_mutex_;
+
         unsigned char ip_[4];
         unsigned short port_;
+
         bool localhost_;
 };
 

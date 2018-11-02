@@ -35,12 +35,12 @@ class WSA_Up_Down
 
 namespace sprot {
 
-void Udp_Transport::connect(const Session_Manager::Params& params)
+void Udp_Transport::enable(const Session_Manager::Params& params)
 {
     static WSA_Up_Down sock_initer;
 
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-
+    std::lock_guard<std::recursive_mutex> lock_read(read_mutex_);
+    std::lock_guard<std::recursive_mutex> lock_write(write_mutex_);
 
     localhost_ = true;
     auto get_ip = [this](const std::string& ip)
@@ -111,7 +111,7 @@ void Udp_Transport::connect(const Session_Manager::Params& params)
     }
 
     port_ = iport;
-    disconnect();
+    disable();
 
     socket_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (socket_ == INVALID_SOCKET)
@@ -177,14 +177,15 @@ void Udp_Transport::connect(const Session_Manager::Params& params)
         THROW(fplog::exceptions::Connect_Failed);
     }
 
-    connected_ = true;
+    enabled_ = true;
 }
 
-void Udp_Transport::disconnect()
+void Udp_Transport::disable()
 {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock_read(read_mutex_);
+    std::lock_guard<std::recursive_mutex> lock_write(write_mutex_);
 
-    if (!connected_)
+    if (!enabled_)
         return;
 
     int res = 0;
@@ -218,13 +219,14 @@ void Udp_Transport::disconnect()
         //TODO: do something meaningful with the error
     }
 
-    connected_ = false;
+    enabled_ = false;
 }
 
-size_t Udp_Transport::read(void* buf, size_t buf_size, size_t timeout)
+size_t Udp_Transport::read(void* buf, size_t buf_size, size_t timeout, Extended_Data& user_data)
 {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-    if (!connected_)
+    std::lock_guard<std::recursive_mutex> lock(read_mutex_);
+
+    if (!enabled_)
         THROW(fplog::exceptions::Read_Failed);
 
     time_point<system_clock, system_clock::duration> timer_start(system_clock::now());
@@ -277,11 +279,13 @@ retry:
 
     if (res != SOCKET_ERROR)
     {
-        remote_addr.sin_port = ntohs(remote_addr.sin_port);
+        if (!null_data(user_data))
+        {
+            user_data.clear();
 
-        if (!localhost_)
-            if (memcmp(&(remote_addr.sin_addr.s_addr), ip_, sizeof(ip_)) != 0)
-                goto retry;
+            user_data.push_back(remote_addr.sin_addr.s_addr);
+            user_data.push_back(ntohs(remote_addr.sin_port));
+        }
 
         return res;
     }
@@ -291,15 +295,16 @@ retry:
     return 0;
 }
 
-size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout)
+size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout, Extended_Data& user_data)
 {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
-    if (!connected_)
+    std::lock_guard<std::recursive_mutex> lock(write_mutex_);
+
+    if (!enabled_ || null_data(user_data))
         THROW(fplog::exceptions::Write_Failed);
 
     sockaddr_in remote_addr;
     int addr_len = sizeof(remote_addr);
-
+/*
     if (localhost_)
     {
         ((char*)&(remote_addr.sin_addr.s_addr))[0] = 127;
@@ -314,6 +319,9 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout)
         ((char*)&(remote_addr.sin_addr.s_addr))[2] = ip_[2];
         ((char*)&(remote_addr.sin_addr.s_addr))[3] = ip_[3];
     }
+*/
+    Ip_Address remote;
+    std::experimental::any_cast<unsigned int>(user_data[0]);
 
     remote_addr.sin_family = AF_INET;
     remote_addr.sin_port = (u_short)(high_uid_ ? uid_.low : uid_.high);
@@ -361,17 +369,16 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout)
 }
 
 Udp_Transport::Udp_Transport():
-connected_(false)
+enabled_(false)
 {
 }
 
 Udp_Transport::~Udp_Transport()
 {
-    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> read_lock(read_mutex_);
+    std::lock_guard<std::recursive_mutex> write_lock(write_mutex_);
 
-    disconnect();
+    disable();
 }
 
 };
-
-

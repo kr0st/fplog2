@@ -44,6 +44,7 @@ class SPROT_API Extended_Transport_Interface
     public:
 
         typedef std::vector<std::experimental::any> Extended_Data;
+
         static Extended_Data no_extended_data;
         static const size_t infinite_wait = 4294967295;
 
@@ -51,6 +52,11 @@ class SPROT_API Extended_Transport_Interface
         virtual size_t write(const void* buf, size_t buf_size, size_t timeout = infinite_wait, Extended_Data& user_data = no_extended_data) = 0;
 
         virtual ~Extended_Transport_Interface();
+
+
+    protected:
+
+        bool null_data(const Extended_Data& user_data) { return (&user_data == &no_extended_data); }
 };
 
 
