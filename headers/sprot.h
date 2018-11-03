@@ -4,7 +4,7 @@
 #include <string>
 #include <map>
 #include <vector>
-#include <experimental/any>
+#include <any>
 #include "fplog_exceptions.h"
 
 #ifdef _WIN32
@@ -36,14 +36,14 @@ class SPROT_API Basic_Transport_Interface
         virtual size_t read(void* buf, size_t buf_size, size_t timeout = infinite_wait) = 0;
         virtual size_t write(const void* buf, size_t buf_size, size_t timeout = infinite_wait) = 0;
 
-        virtual ~Basic_Transport_Interface();
+        virtual ~Basic_Transport_Interface() {}
 };
 
 class SPROT_API Extended_Transport_Interface
 {
     public:
 
-        typedef std::vector<std::experimental::any> Extended_Data;
+        typedef std::vector<std::any> Extended_Data;
 
         static Extended_Data no_extended_data;
         static const size_t infinite_wait = 4294967295;
@@ -51,7 +51,7 @@ class SPROT_API Extended_Transport_Interface
         virtual size_t read(void* buf, size_t buf_size, size_t timeout = infinite_wait, Extended_Data& user_data = no_extended_data) = 0;
         virtual size_t write(const void* buf, size_t buf_size, size_t timeout = infinite_wait, Extended_Data& user_data = no_extended_data) = 0;
 
-        virtual ~Extended_Transport_Interface();
+        virtual ~Extended_Transport_Interface() {}
 
 
     protected:

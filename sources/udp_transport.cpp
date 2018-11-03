@@ -35,6 +35,8 @@ class WSA_Up_Down
 
 namespace sprot {
 
+Extended_Transport_Interface::Extended_Data Extended_Transport_Interface::no_extended_data;
+
 void Udp_Transport::enable(const Session_Manager::Params& params)
 {
     static WSA_Up_Down sock_initer;
@@ -321,15 +323,15 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout, Ex
     }
 */
     Ip_Address remote;
-    std::experimental::any_cast<unsigned int>(user_data[0]);
+    std::any_cast<unsigned int>(user_data[0]);
 
-    remote_addr.sin_family = AF_INET;
+    /*remote_addr.sin_family = AF_INET;
     remote_addr.sin_port = (u_short)(high_uid_ ? uid_.low : uid_.high);
 
     if (!localhost_)
         remote_addr.sin_port = (u_short)uid_.high;
 
-    remote_addr.sin_port = htons(remote_addr.sin_port);
+    remote_addr.sin_port = htons(remote_addr.sin_port);*/
 
     fd_set fdset;
 
