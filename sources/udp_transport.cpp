@@ -322,16 +322,24 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout, Ex
         ((char*)&(remote_addr.sin_addr.s_addr))[3] = ip_[3];
     }
 */
+    if (user_data.size() != 2)
+        THROWM(fplog::exceptions::Incorrect_Parameter, "Missing or incomplete information about receiver.");
+
     Ip_Address remote;
-    std::any_cast<unsigned int>(user_data[0]);
+    unsigned short port;
 
-    /*remote_addr.sin_family = AF_INET;
-    remote_addr.sin_port = (u_short)(high_uid_ ? uid_.low : uid_.high);
+    try
+    {
+        remote.ip = std::any_cast<unsigned int>(user_data[0]);
+        port = htons(std::any_cast<unsigned short>(user_data[1]));
+    }
+    catch (std::bad_cast&)
+    {
+        THROWM(fplog::exceptions::Incorrect_Parameter, "Missing or incomplete information about receiver.");
+    }
 
-    if (!localhost_)
-        remote_addr.sin_port = (u_short)uid_.high;
-
-    remote_addr.sin_port = htons(remote_addr.sin_port);*/
+    remote_addr.sin_addr.s_addr = remote.ip;
+    remote_addr.sin_port = port;
 
     fd_set fdset;
 
