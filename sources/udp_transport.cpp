@@ -138,19 +138,9 @@ void Udp_Transport::enable(const Session_Manager::Params& params)
     listen_addr.sin_port=htons(iport);
 
     if (localhost_)
-    {
-        ((char*)&(listen_addr.sin_addr.s_addr))[0] = 127;
-        ((char*)&(listen_addr.sin_addr.s_addr))[1] = 0;
-        ((char*)&(listen_addr.sin_addr.s_addr))[2] = 0;
-        ((char*)&(listen_addr.sin_addr.s_addr))[3] = 1;
-    }
+        listen_addr.sin_addr.s_addr = 0x0100007f;
     else
-    {
-        ((char*)&(listen_addr.sin_addr.s_addr))[0] = 0;
-        ((char*)&(listen_addr.sin_addr.s_addr))[1] = 0;
-        ((char*)&(listen_addr.sin_addr.s_addr))[2] = 0;
-        ((char*)&(listen_addr.sin_addr.s_addr))[3] = 0;
-    }
+        listen_addr.sin_addr.s_addr = 0;
 
     // Set the exclusive address option
     int opt_val = 1;
@@ -162,8 +152,8 @@ void Udp_Transport::enable(const Session_Manager::Params& params)
     #else
 
     opt_val = 0;
-    setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, (char *) &opt_val, sizeof(opt_val));
-    setsockopt(socket_, SOL_SOCKET, SO_REUSEPORT, (char *) &opt_val, sizeof(opt_val));
+    setsockopt(socket_, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val));
+    setsockopt(socket_, SOL_SOCKET, SO_REUSEPORT, &opt_val, sizeof(opt_val));
 
     #endif
 
@@ -265,9 +255,9 @@ retry:
 
     timeval to;
     to.tv_sec = static_cast<long>(timeout / 1000);
-    to.tv_usec = static_cast<long>((timeout % 1000) * 1000);
+    to.tv_usec = static_cast<int>((timeout % 1000) * 1000);
 
-    int res = select(static_cast<int>(socket_ + 1), &fdset, 0, 0, &to);
+    int res = select(static_cast<int>(socket_ + 1), &fdset, nullptr, nullptr, &to);
     if (res == 0)
         THROW(fplog::exceptions::Timeout);
     if (res != 1)
@@ -289,12 +279,10 @@ retry:
             user_data.push_back(ntohs(remote_addr.sin_port));
         }
 
-        return res;
+        return static_cast<size_t>(res);
     }
     else
         THROW(fplog::exceptions::Read_Failed);
-
-    return 0;
 }
 
 size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout, Extended_Data& user_data)
@@ -358,24 +346,22 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout, Ex
 
     timeval to;
     to.tv_sec = static_cast<long>(timeout / 1000);
-    to.tv_usec = static_cast<long>((timeout % 1000) * 1000);
+    to.tv_usec = static_cast<int>((timeout % 1000) * 1000);
 
-    int res = select(static_cast<int>(socket_ + 1), 0, &fdset, 0, &to);
+    int res = select(static_cast<int>(socket_ + 1), nullptr, &fdset, nullptr, &to);
     if (res == 0)
         THROW(fplog::exceptions::Timeout);
     if (res != 1)
         THROW(fplog::exceptions::Write_Failed);
 
-    res = sendto(socket_, (char*)buf, static_cast<int>(buf_size), 0, (sockaddr*)&remote_addr, addr_len);
+    res = sendto(socket_, buf, static_cast<size_t>(buf_size), 0, (sockaddr*)&remote_addr, static_cast<unsigned int>(addr_len));
     if (res != SOCKET_ERROR)
-        return res;
+        return static_cast<size_t>(res);
     else
     {
-        int e = errno;
+        //int e = errno;
         THROW(fplog::exceptions::Write_Failed);
     }
-
-    return 0;
 }
 
 Udp_Transport::Udp_Transport():
