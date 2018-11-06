@@ -39,8 +39,8 @@ TEST(Udp_Transport_Test, Smoke_Test)
     memcpy(send_buf, message, strlen(message));
 
     sprot::Extended_Transport_Interface::Extended_Data recepient, origin;
-    recepient.push_back(0x0100007f);
-    recepient.push_back(26259);
+    recepient.push_back(static_cast<unsigned int>(0x0100007f));
+    recepient.push_back(static_cast<unsigned short>(26259));
 
     t1.write(send_buf, strlen(message), sprot::Basic_Transport_Interface::infinite_wait, recepient);
 
