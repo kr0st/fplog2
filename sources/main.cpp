@@ -42,9 +42,9 @@ TEST(Udp_Transport_Test, Smoke_Test)
     recepient.push_back(static_cast<unsigned int>(0x0100007f));
     recepient.push_back(static_cast<unsigned short>(26259));
 
-    t1.write(send_buf, strlen(message), sprot::Basic_Transport_Interface::infinite_wait, recepient);
+    t1.write(send_buf, strlen(message), recepient);
 
-    size_t read_bytes = t2.read(recv_buf, sizeof(recv_buf), sprot::Basic_Transport_Interface::infinite_wait, origin);
+    size_t read_bytes = t2.read(recv_buf, sizeof(recv_buf), origin);
     EXPECT_EQ(read_bytes, strlen(message));
     EXPECT_EQ(memcmp(message, recv_buf, strlen(message)), 0);
 }

@@ -214,7 +214,7 @@ void Udp_Transport::disable()
     enabled_ = false;
 }
 
-size_t Udp_Transport::read(void* buf, size_t buf_size, size_t timeout, Extended_Data& user_data)
+size_t Udp_Transport::read(void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout)
 {
     std::lock_guard<std::recursive_mutex> lock(read_mutex_);
 
@@ -285,7 +285,7 @@ retry:
         THROW(fplog::exceptions::Read_Failed);
 }
 
-size_t Udp_Transport::write(const void* buf, size_t buf_size, size_t timeout, Extended_Data& user_data)
+size_t Udp_Transport::write(const void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout)
 {
     std::lock_guard<std::recursive_mutex> lock(write_mutex_);
 

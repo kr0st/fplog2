@@ -48,8 +48,8 @@ class SPROT_API Extended_Transport_Interface
         static Extended_Data no_extended_data;
         static const size_t infinite_wait = 4294967295;
 
-        virtual size_t read(void* buf, size_t buf_size, size_t timeout = infinite_wait, Extended_Data& user_data = no_extended_data) = 0;
-        virtual size_t write(const void* buf, size_t buf_size, size_t timeout = infinite_wait, Extended_Data& user_data = no_extended_data) = 0;
+        virtual size_t read(void* buf, size_t buf_size, Extended_Data& user_data = no_extended_data, size_t timeout = infinite_wait) = 0;
+        virtual size_t write(const void* buf, size_t buf_size, Extended_Data& user_data = no_extended_data, size_t timeout = infinite_wait) = 0;
 
         virtual ~Extended_Transport_Interface() {}
 
@@ -77,9 +77,27 @@ class SPROT_API Session_Manager
 
         static Params empty_params;
 
-        virtual Session* create(const Params& params) = 0;
+        virtual Session* connect(const Params& from, const Params& to) = 0;
+        virtual Session* accept(const Params& config, size_t timeout = Session::infinite_wait) = 0;
 
         virtual ~Session_Manager();
+};
+
+namespace implementation
+{
+    union Frame
+    {
+        struct
+        {
+            unsigned short crc;
+            unsigned char type;
+            unsigned int origin_ip;
+            unsigned short origin_listen_port;
+            char hostname[16];
+            unsigned int sequence;
+            unsigned char data_len;
+        } details;
+    };
 };
 
 };
