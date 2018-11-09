@@ -90,14 +90,19 @@ namespace implementation
         struct
         {
             unsigned short crc;
-            unsigned char type;
+            unsigned short type;
             unsigned int origin_ip;
             unsigned short origin_listen_port;
             char hostname[16];
             unsigned int sequence;
-            unsigned char data_len;
+            unsigned short data_len;
         } details;
+
+        unsigned char bytes[32];
     };
+
+    const unsigned int Max_Frame_Size = 255;
+    const unsigned int Mtu = Max_Frame_Size - sizeof (Frame);
 };
 
 };

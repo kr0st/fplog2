@@ -21,6 +21,9 @@ class L1_transport: public Extended_Transport_Interface
      private:
 
         Extended_Transport_Interface* l0_transport_;
+        unsigned char read_buffer_[implementation::Max_Frame_Size];
+
+        size_t internal_read(void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout = infinite_wait);
 };
 
 };
