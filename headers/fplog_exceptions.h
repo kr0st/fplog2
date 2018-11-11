@@ -71,6 +71,14 @@ class Generic_Exception
             return "[" + facility_ + ", f:" + file_ + ", l:" + buf + "] " + message_;
         }
 
+        Generic_Exception():
+        facility_("N/A"),
+        message_("This is an empty exception."),
+        file_("N/A"),
+        line_(0)
+        {
+        }
+
 
     protected:
 
@@ -78,11 +86,6 @@ class Generic_Exception
         std::string message_;
         std::string file_;
         int line_;
-
-
-    private:
-
-        Generic_Exception();
 };
 
 class Connect_Failed: public Generic_Exception

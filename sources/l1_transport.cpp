@@ -1,18 +1,44 @@
 #include "l1_transport.h"
 #include <fplog_exceptions.h>
+#include <chrono>
 
 namespace sprot
 {
 
+void L1_transport::reader_thread(L1_transport* p)
+{
+    std::unique_lock lock(p->read_signal_mutex_);
+    while (!p->stop_reading_)
+    {
+        std::cv_status to = p->read_signal_.wait_for(lock, std::chrono::milliseconds(500));
+        if (to != std::cv_status::timeout)
+        {
+            std::lock_guard read_lock(p->read_buffer_mutex_);
+            p->exception_happened_ = false;
+
+            try
+            {
+                p->read_bytes_ = p->internal_read(p->read_buffer_, sizeof(p->read_buffer_), p->read_ext_data_, p->read_timeout_);
+            }
+            catch (fplog::exceptions::Generic_Exception& e)
+            {
+                p->exception_happened_ = true;
+                p->read_exception_ = e;
+            }
+        }
+    }
+}
+
 L1_transport::L1_transport(Extended_Transport_Interface* l0_transport):
 l0_transport_(l0_transport),
-read_bytes_(0)
+read_bytes_(0),
+reader_(std::bind(L1_transport::reader_thread, this)),
+stop_reading_(false)
 {
 }
 
 size_t L1_transport::internal_read(void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout)
-{//this method should be executed based on condition variable from a separate thread
-    std::lock_guard lock(read_buffer_mutex_);
+{
     size_t len = l0_transport_->read(buf, buf_size, user_data, timeout);
 
     if (len < sizeof(implementation::Frame))
@@ -42,18 +68,21 @@ size_t L1_transport::schedule_read(Extended_Data& user_data, size_t timeout)
     std::condition_variable wait;
     std::unique_lock lock(waitlist_mutex_);
 
-    if (waitlist_.find(user_data) != waitlist_.end())
+    Ip_Port tuple(user_data);
+
+    if (waitlist_.find(tuple) != waitlist_.end())
     {
-        if (waitlist_[user_data]->wait_for(lock, std::chrono::milliseconds(timeout)) == std::cv_status::timeout)
+        if (waitlist_[tuple]->wait_for(lock, std::chrono::milliseconds(timeout)) == std::cv_status::timeout)
             THROW(fplog::exceptions::Timeout);
     }
 
-    waitlist_[user_data] = &wait;
+    read_timeout_ = timeout;
+    waitlist_[tuple] = &wait;
     read_signal_.notify_all();
 
     if (wait.wait_for(lock, std::chrono::milliseconds(timeout)) == std::cv_status::timeout)
     {
-        waitlist_[user_data] = nullptr;
+        waitlist_[tuple] = nullptr;
         THROW(fplog::exceptions::Timeout);
     }
 
@@ -74,9 +103,14 @@ size_t L1_transport::read(void* buf, size_t buf_size, Extended_Data& user_data, 
     if (buf_size < sizeof (implementation::Max_Frame_Size))
         THROWM(fplog::exceptions::Incorrect_Parameter, "Buffer for storing data is too small.");
 
+    read_bytes_ = 0;
     size_t len = schedule_read(user_data, timeout);
 
     std::lock_guard lock(read_buffer_mutex_);
+
+    if (exception_happened_)
+        throw read_exception_;
+
     memcpy(buf, read_buffer_, len);
 
     return len;
@@ -92,6 +126,8 @@ size_t L1_transport::write(const void* buf, size_t buf_size, Extended_Data& user
 
 L1_transport::~L1_transport()
 {
+    stop_reading_ = true;
+    reader_.join();
 }
 
 };

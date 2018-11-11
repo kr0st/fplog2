@@ -6,6 +6,8 @@
 #include <udp_transport.h>
 #include <gtest/gtest.h>
 #include <string.h>
+#include <l1_transport.h>
+#include <thread>
 
 
 TEST(Udp_Transport_Test, Smoke_Test)
@@ -49,6 +51,13 @@ TEST(Udp_Transport_Test, Smoke_Test)
     EXPECT_EQ(memcmp(message, recv_buf, strlen(message)), 0);
 }
 
+TEST(L1_Transport_Test, Smoke_Test)
+{
+    sprot::Udp_Transport l0;
+    sprot::L1_transport l1(&l0);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+}
 
 int main(int argc, char **argv)
 {

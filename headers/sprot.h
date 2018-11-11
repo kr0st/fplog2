@@ -45,6 +45,36 @@ class SPROT_API Extended_Transport_Interface
 
         typedef std::vector<std::any> Extended_Data;
 
+        struct Ip_Port
+        {
+            unsigned int ip;
+            unsigned short port;
+
+            Ip_Port(Extended_Data& ext_data){ from_ext_data(ext_data); }
+
+            bool operator< (const Ip_Port& rhs) const
+            {
+                if (ip == rhs.ip)
+                    return (port < rhs.port);
+                return (ip < rhs.ip);
+            }
+
+            Ip_Port& from_ext_data(Extended_Data& ext_data)
+            {
+                try
+                {
+                    ip = std::any_cast<unsigned short>(ext_data[0]);
+                    port = std::any_cast<unsigned short>(ext_data[1]);
+                }
+                catch (std::bad_cast&)
+                {
+                    THROWM(fplog::exceptions::Incorrect_Parameter, "Provided extended data contains unexpected data.");
+                }
+
+                return *this;
+            }
+        };
+
         static Extended_Data no_extended_data;
         static const size_t infinite_wait = 4294967295;
 
