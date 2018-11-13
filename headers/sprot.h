@@ -50,6 +50,7 @@ class SPROT_API Extended_Transport_Interface
             unsigned int ip;
             unsigned short port;
 
+            Ip_Port(): ip(0), port(0) {}
             Ip_Port(Extended_Data& ext_data){ from_ext_data(ext_data); }
 
             bool operator< (const Ip_Port& rhs) const
@@ -61,9 +62,17 @@ class SPROT_API Extended_Transport_Interface
 
             Ip_Port& from_ext_data(Extended_Data& ext_data)
             {
+                if (ext_data.size() < 2)
+                {
+                    ip = 0;
+                    port = 0;
+
+                    return *this;
+                }
+
                 try
                 {
-                    ip = std::any_cast<unsigned short>(ext_data[0]);
+                    ip = std::any_cast<unsigned int>(ext_data[0]);
                     port = std::any_cast<unsigned short>(ext_data[1]);
                 }
                 catch (std::bad_cast&)

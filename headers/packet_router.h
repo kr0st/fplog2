@@ -1,5 +1,5 @@
 #ifndef L1_TRANSPORT_H
-#define L1_TRANSPORT_H
+#define PACKET_ROUTER_H
 
 #include <sprot.h>
 #include <map>
@@ -11,16 +11,16 @@
 namespace sprot
 {
 
-class L1_transport: public Extended_Transport_Interface
+class Packet_Router: public Extended_Transport_Interface
 {
     public:
 
-        L1_transport(Extended_Transport_Interface* l0_transport);
+        Packet_Router(Extended_Transport_Interface* l0_transport);
 
         virtual size_t read(void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout = infinite_wait);
         virtual size_t write(const void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout = infinite_wait);
 
-        ~L1_transport();
+        ~Packet_Router();
 
 
      private:
@@ -36,19 +36,19 @@ class L1_transport: public Extended_Transport_Interface
         fplog::exceptions::Generic_Exception read_exception_;
 
         std::map<Ip_Port, std::condition_variable*> waitlist_;
+        std::condition_variable* last_scheduled_read_;
         std::mutex waitlist_mutex_;
 
         std::condition_variable read_signal_;
         std::mutex read_signal_mutex_;
 
         size_t schedule_read(Extended_Data& user_data, size_t timeout = infinite_wait);
-        size_t internal_read(void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout = infinite_wait);
 
-        static void reader_thread(L1_transport* p);
+        static void reader_thread(Packet_Router* p);
         std::thread reader_;
         bool stop_reading_;
 };
 
 };
 
-#endif // L1_TRANSPORT_H
+#endif // PACKET_ROUTER_H

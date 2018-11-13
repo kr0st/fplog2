@@ -13,6 +13,6 @@ link_directories(${CMAKE_CURRENT_SOURCE_DIR}/dependencies/lib/x64)
 add_executable(${PROJECT_NAME} "sources/main.cpp"
 "sources/utils.cpp"
 "sources/udp_transport.cpp"
-"sources/l1_transport.cpp")
+"sources/packet_router.cpp")
 
 target_link_libraries(${PROJECT_NAME} libgtest.a)
