@@ -8,7 +8,15 @@
 #include <string.h>
 #include <packet_router.h>
 #include <thread>
+#include <random>
 
+
+void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
+{
+    std::uniform_int_distribution<unsigned char> range(0, 255);
+    for (int i = 0; i < len; ++i)
+        buf[i] = range(*rng);
+}
 
 TEST(Udp_Transport_Test, Smoke_Test)
 {
@@ -116,6 +124,36 @@ TEST(L1_Transport_Test, Smoke_Test)
 
     sender.join();
     return;
+}
+
+static std::mt19937 g_rng1(31337);
+static std::mt19937 g_rng2(31338);
+static std::mt19937 g_rng3(31339);
+
+sprot::implementation::Frame make_dummy_frame(unsigned short origin_listen_port, unsigned int origin_ip, unsigned short data_len)
+{
+    sprot::implementation::Frame frame;
+    frame.details.crc = 666;
+    frame.details.data_len = data_len;
+    sprintf(frame.details.hostname, "WORKSTATION-666");
+    frame.details.type = 0;
+    frame.details.sequence = 999;
+    frame.details.origin_ip = origin_ip;
+    frame.details.origin_listen_port = origin_listen_port;
+
+    return frame;
+}
+
+unsigned short fill_buffer_with_frame_and_random_data(unsigned char* buf, unsigned short data_len, unsigned short origin_listen_port, unsigned int origin_ip, std::mt19937* rng)
+{
+    sprot::implementation::Frame frame(make_dummy_frame(origin_listen_port, origin_ip, data_len));
+    memcpy(buf, frame.bytes, sizeof(frame.bytes));
+    randomize_buffer(buf + sizeof(frame.bytes), data_len, rng);
+    return (data_len + sizeof(frame.bytes));
+}
+
+void read_from_transport()
+{
 }
 
 int main(int argc, char **argv)
