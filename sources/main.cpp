@@ -1,3 +1,5 @@
+
+#include <stdio.h>
 #include <iostream>
 #include <date/date.h>
 #include <fplog_exceptions.h>
@@ -152,8 +154,116 @@ unsigned short fill_buffer_with_frame_and_random_data(unsigned char* buf, unsign
     return (data_len + sizeof(frame.bytes));
 }
 
-void read_from_transport()
+unsigned long write_to_transport(unsigned int bytes_to_write, std::string& file_name, std::mt19937* rng, sprot::Basic_Transport_Interface* basic = nullptr,
+                                 sprot::Extended_Transport_Interface* extended = nullptr,
+                                 sprot::Extended_Transport_Interface::Extended_Data& recipient = sprot::Extended_Transport_Interface::no_extended_data)
 {
+    if (bytes_to_write == 0)
+        return 0;
+
+    if ((basic == nullptr) && (extended == nullptr))
+        THROW(fplog::exceptions::Transport_Missing);
+
+    if (extended && sprot::Extended_Transport_Interface::null_data(recipient))
+        THROW(fplog::exceptions::Incorrect_Parameter);
+
+    if (!rng)
+        THROW(fplog::exceptions::Incorrect_Parameter);
+
+    unsigned long bytes_written = 0;
+    unsigned char send_buf[sprot::implementation::Max_Frame_Size];
+    FILE* file = fopen(file_name.c_str(), "w");
+
+    try
+    {
+        while (bytes_written < bytes_to_write)
+        {
+            randomize_buffer(send_buf, sprot::implementation::Max_Frame_Size, rng);
+
+            unsigned long current_bytes = 0;
+            unsigned long how_much = (sprot::implementation::Max_Frame_Size < (bytes_to_write - bytes_written)) ? sprot::implementation::Max_Frame_Size :
+                                                                                                                  (bytes_to_write - bytes_written);
+
+            if (extended)
+                current_bytes = extended->write(send_buf, how_much, recipient, 1000);
+            else
+                current_bytes = basic->write(send_buf, how_much, 1000);
+
+            fwrite(send_buf, current_bytes, 1, file);
+
+            bytes_written += current_bytes;
+        }
+    }
+    catch (fplog::exceptions::Generic_Exception& e)
+    {
+        std::cout << e.what();
+
+        fflush(file);
+        fclose(file);
+
+        return bytes_written;
+    }
+
+    fflush(file);
+    fclose(file);
+
+    return bytes_written;
+}
+
+unsigned long read_from_transport(unsigned int bytes_to_read, std::string& file_name, sprot::Basic_Transport_Interface* basic = nullptr,
+                         sprot::Extended_Transport_Interface* extended = nullptr,
+                         sprot::Extended_Transport_Interface::Extended_Data& origin = sprot::Extended_Transport_Interface::no_extended_data)
+{
+    if (bytes_to_read == 0)
+        return 0;
+
+    if ((basic == nullptr) && (extended == nullptr))
+        THROW(fplog::exceptions::Transport_Missing);
+
+    if (extended && sprot::Extended_Transport_Interface::null_data(origin))
+        THROW(fplog::exceptions::Incorrect_Parameter);
+
+    unsigned long bytes_read = 0;
+    unsigned char read_buf[sprot::implementation::Max_Frame_Size];
+
+    FILE* file = fopen(file_name.c_str(), "w");
+
+    try
+    {
+        while (bytes_read < bytes_to_read)
+        {
+            unsigned long current_bytes = 0;
+
+            if (extended)
+                current_bytes = extended->read(read_buf, sprot::implementation::Max_Frame_Size, origin, 1000);
+            else
+                current_bytes = basic->read(read_buf, sprot::implementation::Max_Frame_Size, 1000);
+
+            fwrite(read_buf, current_bytes, 1, file);
+
+            bytes_read += current_bytes;
+        }
+    }
+    catch (fplog::exceptions::Generic_Exception& e)
+    {
+        std::cout << e.what();
+
+        fflush(file);
+        fclose(file);
+
+        return bytes_read;
+    }
+
+    fflush(file);
+    fclose(file);
+
+    return bytes_read;
+}
+
+TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
+{
+
+    return;
 }
 
 int main(int argc, char **argv)

@@ -92,10 +92,7 @@ class SPROT_API Extended_Transport_Interface
 
         virtual ~Extended_Transport_Interface() {}
 
-
-    protected:
-
-        bool null_data(const Extended_Data& user_data) { return (&user_data == &no_extended_data); }
+        static bool null_data(const Extended_Data& user_data) { return (&user_data == &no_extended_data); }
 };
 
 

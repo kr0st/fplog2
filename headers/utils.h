@@ -7,6 +7,7 @@
 #include <locale>
 #include <algorithm>
 #include <vector>
+#include <fstream>
 
 template<typename T>
 struct std::hash<std::vector<T>>
@@ -34,6 +35,22 @@ inline void hash_combine(std::size_t& seed, T const& v)
 
 namespace generic_util
 {
+
+template<typename InputIterator1, typename InputIterator2>
+bool
+range_equal(InputIterator1 first1, InputIterator1 last1,
+        InputIterator2 first2, InputIterator2 last2)
+{
+    while(first1 != last1 && first2 != last2)
+    {
+        if(*first1 != *first2) return false;
+        ++first1;
+        ++first2;
+    }
+    return (first1 == last1) && (first2 == last2);
+}
+
+bool compare_files(const std::string& filename1, const std::string& filename2);
 
 //using boost::hash_combine
 template <class T>
