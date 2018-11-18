@@ -11,7 +11,8 @@
 #include <packet_router.h>
 #include <thread>
 #include <random>
-
+#include <vector>
+#include <any>
 
 void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
 {
@@ -154,7 +155,7 @@ unsigned short fill_buffer_with_frame_and_random_data(unsigned char* buf, unsign
     return (data_len + sizeof(frame.bytes));
 }
 
-unsigned long write_to_transport(unsigned int bytes_to_write, std::string& file_name, std::mt19937* rng, sprot::Basic_Transport_Interface* basic = nullptr,
+unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_name, std::mt19937* rng, sprot::Basic_Transport_Interface* basic = nullptr,
                                  sprot::Extended_Transport_Interface* extended = nullptr,
                                  sprot::Extended_Transport_Interface::Extended_Data& recipient = sprot::Extended_Transport_Interface::no_extended_data)
 {
@@ -210,7 +211,7 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string& file_
     return bytes_written;
 }
 
-unsigned long read_from_transport(unsigned int bytes_to_read, std::string& file_name, sprot::Basic_Transport_Interface* basic = nullptr,
+unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_name, sprot::Basic_Transport_Interface* basic = nullptr,
                          sprot::Extended_Transport_Interface* extended = nullptr,
                          sprot::Extended_Transport_Interface::Extended_Data& origin = sprot::Extended_Transport_Interface::no_extended_data)
 {
@@ -262,6 +263,88 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string& file_
 
 TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
 {
+    sprot::Udp_Transport t1, t2;
+
+    sprot::Session_Manager::Params params;
+    sprot::Session_Manager::Param p;
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26260";
+    params.insert(p);
+
+    t1.enable(params);
+
+    params["port"] = "26261";
+
+    t2.enable(params);
+
+    sprot::Packet_Router r1(&t1);
+    sprot::Packet_Router r2(&t2);
+
+    unsigned long read_bytes1 = 0, read_bytes2 = 0, read_bytes3 = 0;
+    unsigned long sent_bytes1 = 0, sent_bytes2 = 0, sent_bytes3 = 0;
+
+    std::thread reader1([&]{
+        sprot::Extended_Transport_Interface::Extended_Data origin_data;
+        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
+        origin_data.push_back(static_cast<unsigned short>(26262));
+
+        read_bytes1 = read_from_transport(5242880, std::string("reader1.txt"), nullptr, &r1, origin_data);
+    });
+
+    std::thread reader2([&]{
+        sprot::Extended_Transport_Interface::Extended_Data origin_data;
+        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
+        origin_data.push_back(static_cast<unsigned short>(26263));
+
+        read_bytes2 = read_from_transport(5242880, std::string("reader2.txt"), nullptr, &r1, origin_data);
+    });
+
+    std::thread reader3([&]{
+        sprot::Extended_Transport_Interface::Extended_Data origin_data;
+        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
+        origin_data.push_back(static_cast<unsigned short>(26264));
+
+        read_bytes3 = read_from_transport(5242880, std::string("reader3.txt"), nullptr, &r1, origin_data);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+    std::thread writer1([&]{
+        sprot::Extended_Transport_Interface::Extended_Data origin_data;
+        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
+        origin_data.push_back(static_cast<unsigned short>(26262));
+
+        sent_bytes1 = write_to_transport(5242880, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data);
+    });
+
+    std::thread writer2([&]{
+        sprot::Extended_Transport_Interface::Extended_Data origin_data;
+        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
+        origin_data.push_back(static_cast<unsigned short>(26263));
+
+        sent_bytes2 = write_to_transport(5242880, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data);
+    });
+
+    std::thread writer3([&]{
+        sprot::Extended_Transport_Interface::Extended_Data origin_data;
+        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
+        origin_data.push_back(static_cast<unsigned short>(26264));
+
+        sent_bytes3 = write_to_transport(5242880, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data);
+    });
+
+    writer1.join();
+    writer2.join();
+    writer3.join();
+
+    reader1.join();
+    reader2.join();
+    reader3.join();
 
     return;
 }
