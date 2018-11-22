@@ -107,17 +107,27 @@ TEST(L1_Transport_Test, Smoke_Test)
     recepient.push_back(static_cast<unsigned int>(0x0100007f));
     recepient.push_back(static_cast<unsigned short>(26260));
 
+    origin.push_back(static_cast<unsigned int>(0x0100007f));
+    origin.push_back(static_cast<unsigned short>(26261));
+
+
     sprot::Packet_Router r1(&t1);
+    bool sending = true;
 
     std::thread sender([&]
     {
-        sprot::Packet_Router r2(&t2);
-        r2.write(send_buf, strlen(message) + sizeof (frame.bytes), recepient);
+        while (sending)
+        {
+            sprot::Packet_Router r2(&t2);
+            r2.write(send_buf, strlen(message) + sizeof (frame.bytes), recepient);
+        }
     });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    //std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
     size_t received_bytes = r1.read(recv_buf, sizeof (recv_buf), origin);
+    sending = false;
+
     sprot::implementation::Frame received_frame;
     memcpy(received_frame.bytes, recv_buf, sizeof(received_frame.bytes));
 
@@ -157,7 +167,8 @@ unsigned short fill_buffer_with_frame_and_random_data(unsigned char* buf, unsign
 
 unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_name, std::mt19937* rng, sprot::Basic_Transport_Interface* basic = nullptr,
                                  sprot::Extended_Transport_Interface* extended = nullptr,
-                                 sprot::Extended_Transport_Interface::Extended_Data& recipient = sprot::Extended_Transport_Interface::no_extended_data)
+                                 sprot::Extended_Transport_Interface::Extended_Data& fake_origin = sprot::Extended_Transport_Interface::no_extended_data,
+                                 unsigned short real_recipient_listen_port = 0)
 {
     if (bytes_to_write == 0)
         return 0;
@@ -165,7 +176,7 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
     if ((basic == nullptr) && (extended == nullptr))
         THROW(fplog::exceptions::Transport_Missing);
 
-    if (extended && sprot::Extended_Transport_Interface::null_data(recipient))
+    if (extended && sprot::Extended_Transport_Interface::null_data(fake_origin))
         THROW(fplog::exceptions::Incorrect_Parameter);
 
     if (!rng)
@@ -179,16 +190,19 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
     {
         while (bytes_written < bytes_to_write)
         {
-            randomize_buffer(send_buf, sprot::implementation::Max_Frame_Size, rng);
+            sprot::Extended_Transport_Interface::Ip_Port fake_ip_port(fake_origin);
+            fill_buffer_with_frame_and_random_data(send_buf, sprot::implementation::Max_Frame_Size, fake_ip_port.port, fake_ip_port.ip, rng);
 
             unsigned long current_bytes = 0;
             unsigned long how_much = (sprot::implementation::Max_Frame_Size < (bytes_to_write - bytes_written)) ? sprot::implementation::Max_Frame_Size :
                                                                                                                   (bytes_to_write - bytes_written);
+            sprot::Extended_Transport_Interface::Extended_Data recipient(fake_origin);
+            recipient[1] = static_cast<unsigned short>(real_recipient_listen_port);
 
             if (extended)
-                current_bytes = extended->write(send_buf, how_much, recipient, 1000);
+                current_bytes = extended->write(send_buf, how_much, recipient, 5000);
             else
-                current_bytes = basic->write(send_buf, how_much, 1000);
+                current_bytes = basic->write(send_buf, how_much, 5000);
 
             fwrite(send_buf, current_bytes, 1, file);
 
@@ -236,9 +250,9 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
             unsigned long current_bytes = 0;
 
             if (extended)
-                current_bytes = extended->read(read_buf, sprot::implementation::Max_Frame_Size, origin, 1000);
+                current_bytes = extended->read(read_buf, sprot::implementation::Max_Frame_Size, origin, 5000);
             else
-                current_bytes = basic->read(read_buf, sprot::implementation::Max_Frame_Size, 1000);
+                current_bytes = basic->read(read_buf, sprot::implementation::Max_Frame_Size, 5000);
 
             fwrite(read_buf, current_bytes, 1, file);
 
@@ -319,7 +333,7 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
         origin_data.push_back(static_cast<unsigned int>(0x0100007f));
         origin_data.push_back(static_cast<unsigned short>(26262));
 
-        sent_bytes1 = write_to_transport(5242880, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data);
+        sent_bytes1 = write_to_transport(5242880, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer2([&]{
@@ -327,7 +341,7 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
         origin_data.push_back(static_cast<unsigned int>(0x0100007f));
         origin_data.push_back(static_cast<unsigned short>(26263));
 
-        sent_bytes2 = write_to_transport(5242880, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data);
+        sent_bytes2 = write_to_transport(5242880, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer3([&]{
@@ -335,7 +349,7 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
         origin_data.push_back(static_cast<unsigned int>(0x0100007f));
         origin_data.push_back(static_cast<unsigned short>(26264));
 
-        sent_bytes3 = write_to_transport(5242880, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data);
+        sent_bytes3 = write_to_transport(5242880, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data, 26260);
     });
 
     writer1.join();

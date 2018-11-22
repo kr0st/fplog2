@@ -7,49 +7,52 @@ namespace sprot
 
 void Packet_Router::reader_thread(Packet_Router* p)
 {
-    std::unique_lock lock(p->read_signal_mutex_);
     while (!p->stop_reading_)
     {
-        std::cv_status to = p->read_signal_.wait_for(lock, std::chrono::milliseconds(500));
-        if (to != std::cv_status::timeout)
+        std::lock_guard read_lock(p->read_buffer_mutex_);
+        p->exception_happened_ = false;
+
+        try
         {
-            std::lock_guard read_lock(p->read_buffer_mutex_);
-            p->exception_happened_ = false;
+            p->read_bytes_ = p->l0_transport_->read(p->read_buffer_, sizeof(p->read_buffer_), p->read_ext_data_);
+            if (p->read_ext_data_.size() < 2)
+                continue;
 
-            try
+            if (p->read_bytes_ < sizeof(implementation::Frame))
+                THROWM(fplog::exceptions::Read_Failed, "L1 received too little packet data - less than frame header.");
+
+            implementation::Frame frame;
+            memcpy(frame.bytes, p->read_buffer_, sizeof(implementation::Frame));
+
+            p->read_ext_data_[1] = static_cast<unsigned short>(frame.details.origin_listen_port);
+
+            Ip_Port tuple(p->read_ext_data_);
+
+            if (p->waitlist_.find(tuple) != p->waitlist_.end())
+                p->last_scheduled_read_ = p->waitlist_[tuple];
+            else
             {
-                p->last_scheduled_read_ = nullptr;
-                p->read_bytes_ = p->l0_transport_->read(p->read_buffer_, sizeof(p->read_buffer_), p->read_ext_data_, p->read_timeout_);
-                if (p->read_ext_data_.size() < 2)
-                    continue;
+                Ip_Port empty_tuple;
+                if (p->waitlist_.find(empty_tuple) != p->waitlist_.end())
+                    p->last_scheduled_read_ = p->waitlist_[empty_tuple];
+            }
 
-                Ip_Port tuple(p->read_ext_data_);
-
-                if (p->waitlist_.find(tuple) != p->waitlist_.end())
-                    p->last_scheduled_read_ = p->waitlist_[tuple];
-                else
-                {
-                    Ip_Port empty_tuple;
-                    if (p->waitlist_.find(empty_tuple) != p->waitlist_.end())
-                        p->last_scheduled_read_ = p->waitlist_[empty_tuple];
-                }
-
-                if (p->read_bytes_ < sizeof(implementation::Frame))
-                    THROWM(fplog::exceptions::Read_Failed, "L1 received too little packet data - less than frame header.");
-
-                implementation::Frame frame;
-                memcpy(frame.bytes, p->read_buffer_, sizeof(implementation::Frame));
-
-                p->read_ext_data_[1] = static_cast<unsigned short>(frame.details.origin_listen_port);
+            if (p->last_scheduled_read_)
+            {
                 p->last_scheduled_read_->notify_all();
+                p->last_scheduled_read_ = nullptr;
             }
-            catch (fplog::exceptions::Generic_Exception& e)
-            {
-                p->exception_happened_ = true;
-                p->read_exception_ = e;
-                if (p->last_scheduled_read_)
-                    p->last_scheduled_read_->notify_all();
-            }
+        }
+        catch (fplog::exceptions::Timeout&)
+        {
+            continue;
+        }
+        catch (fplog::exceptions::Generic_Exception& e)
+        {
+            p->exception_happened_ = true;
+            p->read_exception_ = e;
+            if (p->last_scheduled_read_)
+                p->last_scheduled_read_->notify_all();
         }
     }
 }
@@ -77,7 +80,6 @@ size_t Packet_Router::schedule_read(Extended_Data& user_data, size_t timeout)
 
     read_timeout_ = timeout;
     waitlist_[tuple] = &wait;
-    read_signal_.notify_all();
 
     if (wait.wait_for(lock, std::chrono::milliseconds(timeout)) == std::cv_status::timeout)
     {
@@ -112,7 +114,11 @@ size_t Packet_Router::read(void* buf, size_t buf_size, Extended_Data& user_data,
     std::lock_guard lock(read_buffer_mutex_);
 
     if (exception_happened_)
+    {
+        exception_happened_ = false;
+        last_scheduled_read_ = nullptr;
         throw read_exception_;
+    }
 
     memcpy(buf, read_buffer_, len);
 

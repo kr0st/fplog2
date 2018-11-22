@@ -39,9 +39,6 @@ class Packet_Router: public Extended_Transport_Interface
         std::condition_variable* last_scheduled_read_;
         std::mutex waitlist_mutex_;
 
-        std::condition_variable read_signal_;
-        std::mutex read_signal_mutex_;
-
         size_t schedule_read(Extended_Data& user_data, size_t timeout = infinite_wait);
 
         static void reader_thread(Packet_Router* p);
