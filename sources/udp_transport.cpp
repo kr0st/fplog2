@@ -266,7 +266,7 @@ retry:
 #ifdef __APPLE__
     res = recvfrom((int)socket_, buf, buf_size, 0, (sockaddr*)&remote_addr, (socklen_t *)&addr_len);
 #else
-    res = recvfrom(socket_, (char*)buf, static_cast<int>(buf_size), 0, (sockaddr*)&remote_addr, &addr_len);
+    res = recvfrom(socket_, (char*)buf, static_cast<int>(buf_size), 0, (sockaddr*)&remote_addr, (socklen_t *)&addr_len);
 #endif
 
     if (res != SOCKET_ERROR)

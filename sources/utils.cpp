@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <mutex>
 #include <string>
+#include <cstring>
 #include <thread>
 #include <chrono>
 #include <iostream>

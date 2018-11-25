@@ -3,6 +3,7 @@
 #include <string>
 #include <stdlib.h>
 #include <stdio.h>
+#include <cstring>
 
 #ifndef __SHORT_FORM_OF_FILE__
 
