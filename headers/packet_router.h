@@ -27,19 +27,19 @@ class Packet_Router: public Extended_Transport_Interface
 
         Extended_Transport_Interface* l0_transport_;
 
-        unsigned char read_buffer_[implementation::Max_Frame_Size];
-        size_t read_bytes_;
-        size_t read_timeout_;
-        bool exception_happened_;
-        std::mutex read_buffer_mutex_;
-        Extended_Data read_ext_data_;
-        fplog::exceptions::Generic_Exception read_exception_;
+        struct Read_Request
+        {
+            unsigned char read_buffer[implementation::Max_Frame_Size];
+            size_t read_bytes = 0;
+            std::mutex* mutex = nullptr;
+            std::condition_variable* wait = nullptr;
+            Extended_Data read_ext_data;
+        };
 
-        std::map<Ip_Port, std::condition_variable*> waitlist_;
-        std::condition_variable* last_scheduled_read_;
+        std::map<Ip_Port, Read_Request> waitlist_;
         std::mutex waitlist_mutex_;
 
-        size_t schedule_read(Extended_Data& user_data, size_t timeout = infinite_wait);
+        Read_Request schedule_read(Extended_Data& user_data, size_t timeout = infinite_wait);
 
         static void reader_thread(Packet_Router* p);
         std::thread reader_;

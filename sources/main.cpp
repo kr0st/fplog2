@@ -123,8 +123,6 @@ TEST(L1_Transport_Test, Smoke_Test)
         }
     });
 
-    //std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-
     size_t received_bytes = r1.read(recv_buf, sizeof (recv_buf), origin);
     sending = false;
 

@@ -7,91 +7,167 @@ namespace sprot
 
 void Packet_Router::reader_thread(Packet_Router* p)
 {
+    unsigned char read_buffer[sprot::implementation::Max_Frame_Size];
+
     while (!p->stop_reading_)
     {
-        std::lock_guard read_lock(p->read_buffer_mutex_);
-        p->exception_happened_ = false;
+        Extended_Data read_ext_data;
+        Read_Request req;
 
         try
         {
-            p->read_bytes_ = p->l0_transport_->read(p->read_buffer_, sizeof(p->read_buffer_), p->read_ext_data_);
-            if (p->read_ext_data_.size() < 2)
+            unsigned long read_bytes = p->l0_transport_->read(read_buffer, sizeof(read_buffer), read_ext_data, 500);
+
+            if (read_ext_data.size() < 2)
+                continue;
+            if (read_bytes < sizeof(implementation::Frame))
                 continue;
 
-            if (p->read_bytes_ < sizeof(implementation::Frame))
-                THROWM(fplog::exceptions::Read_Failed, "L1 received too little packet data - less than frame header.");
-
             implementation::Frame frame;
-            memcpy(frame.bytes, p->read_buffer_, sizeof(implementation::Frame));
+            memcpy(frame.bytes, read_buffer, sizeof(implementation::Frame));
 
-            p->read_ext_data_[1] = static_cast<unsigned short>(frame.details.origin_listen_port);
+            read_ext_data[1] = static_cast<unsigned short>(frame.details.origin_listen_port);
 
-            Ip_Port tuple(p->read_ext_data_);
+            Ip_Port tuple(read_ext_data);
 
-            if (p->waitlist_.find(tuple) != p->waitlist_.end())
-                p->last_scheduled_read_ = p->waitlist_[tuple];
-            else
             {
-                Ip_Port empty_tuple;
-                if (p->waitlist_.find(empty_tuple) != p->waitlist_.end())
-                    p->last_scheduled_read_ = p->waitlist_[empty_tuple];
+                std::lock_guard lock(p->waitlist_mutex_);
+
+                if (p->waitlist_.find(tuple) != p->waitlist_.end())
+                    req = p->waitlist_[tuple];
+                else
+                {
+                    Ip_Port empty_tuple;
+                    if (p->waitlist_.find(empty_tuple) != p->waitlist_.end())
+                        req = p->waitlist_[empty_tuple];
+                    tuple = empty_tuple;
+                }
+
+                req.read_bytes = read_bytes;
+                memcpy(req.read_buffer, read_buffer, read_bytes);
+                req.read_ext_data = read_ext_data;
+
+                if (!req.mutex)
+                    req.mutex = new std::mutex();
+                if (!req.wait)
+                    req.wait = new std::condition_variable();
+
+                p->waitlist_[tuple] = req;
             }
 
-            if (p->last_scheduled_read_)
-            {
-                p->last_scheduled_read_->notify_all();
-                p->last_scheduled_read_ = nullptr;
-            }
+            req.wait->notify_all();
         }
-        catch (fplog::exceptions::Timeout&)
+        catch (std::exception&)
         {
             continue;
         }
-        catch (fplog::exceptions::Generic_Exception& e)
+        catch (fplog::exceptions::Generic_Exception&)
         {
-            p->exception_happened_ = true;
-            p->read_exception_ = e;
-            if (p->last_scheduled_read_)
-                p->last_scheduled_read_->notify_all();
+            continue;
         }
     }
 }
 
 Packet_Router::Packet_Router(Extended_Transport_Interface* l0_transport):
 l0_transport_(l0_transport),
-read_bytes_(0),
 reader_(std::bind(Packet_Router::reader_thread, this)),
 stop_reading_(false)
 {
 }
 
-size_t Packet_Router::schedule_read(Extended_Data& user_data, size_t timeout)
-{
-    std::condition_variable wait;
-    std::unique_lock lock(waitlist_mutex_);
-
+Packet_Router::Read_Request Packet_Router::schedule_read(Extended_Data& user_data, size_t timeout)
+{   
+    Read_Request req;
     Ip_Port tuple(user_data);
 
-    if (waitlist_.find(tuple) != waitlist_.end())
+    std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start(std::chrono::system_clock::now());
+    auto check_time_out = [&timeout, &timer_start]()
     {
-        if (waitlist_[tuple]->wait_for(lock, std::chrono::milliseconds(timeout)) == std::cv_status::timeout)
+        auto timer_start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(timer_start);
+        auto timer_stop_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+        std::chrono::milliseconds timeout_ms(timeout);
+
+        if (timer_stop_ms - timer_start_ms >= timeout_ms)
             THROW(fplog::exceptions::Timeout);
+    };
+
+    bool duplicate = false;
+
+    {
+        std::lock_guard lock(waitlist_mutex_);
+        std::map<Ip_Port, Read_Request>::iterator res(waitlist_.find(tuple));
+
+        if ( res != waitlist_.end())
+            duplicate = true;
+
+        if (res == waitlist_.end())
+        {
+            req.mutex = new std::mutex();
+            req.wait = new std::condition_variable();
+
+            waitlist_[tuple] = req;
+        }
+        else
+            req = res->second;
     }
 
-    read_timeout_ = timeout;
-    waitlist_[tuple] = &wait;
-
-    if (wait.wait_for(lock, std::chrono::milliseconds(timeout)) == std::cv_status::timeout)
+    while (duplicate)
     {
-        waitlist_[tuple] = nullptr;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        check_time_out();
+
+        std::lock_guard lock(waitlist_mutex_);
+        std::map<Ip_Port, Read_Request>::iterator res(waitlist_.find(tuple));
+
+        if (res != waitlist_.end())
+            duplicate = true;
+        else
+        {
+            req.mutex = new std::mutex();
+            req.wait = new std::condition_variable();
+
+            waitlist_[tuple] = req;
+
+            duplicate = false;
+        }
+    }
+
+    std::unique_lock ulock(*req.mutex);
+    if (req.wait->wait_for(ulock, std::chrono::milliseconds(timeout)) == std::cv_status::timeout)
+    {
+        ulock.release();
+
+        std::lock_guard lock(waitlist_mutex_);
+
+        std::map<Ip_Port, Read_Request>::iterator res(waitlist_.find(tuple));
+
+        delete res->second.wait;
+        delete res->second.mutex;
+        res->second.wait = nullptr;
+        res->second.mutex = nullptr;
+
+        waitlist_.erase(res);
+
         THROW(fplog::exceptions::Timeout);
     }
 
-    user_data.clear();
-    for (auto it = read_ext_data_.begin(); it != read_ext_data_.end(); ++it)
-        user_data.push_back(*it);
+    ulock.release();
 
-    return read_bytes_;
+    {
+        std::lock_guard lock(waitlist_mutex_);
+        std::map<Ip_Port, Read_Request>::iterator res(waitlist_.find(tuple));
+
+        delete res->second.wait;
+        delete res->second.mutex;
+        res->second.wait = nullptr;
+        res->second.mutex = nullptr;
+
+        req = res->second;
+
+        waitlist_.erase(res);
+    }
+
+    return req;
 }
 
 size_t Packet_Router::read(void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout)
@@ -108,21 +184,15 @@ size_t Packet_Router::read(void* buf, size_t buf_size, Extended_Data& user_data,
     if (buf_size < sizeof (implementation::Max_Frame_Size))
         THROWM(fplog::exceptions::Incorrect_Parameter, "Buffer for storing data is too small.");
 
-    read_bytes_ = 0;
-    size_t len = schedule_read(user_data, timeout);
+    Read_Request req(schedule_read(user_data, timeout));
 
-    std::lock_guard lock(read_buffer_mutex_);
+    memcpy(buf, req.read_buffer, req.read_bytes);
 
-    if (exception_happened_)
-    {
-        exception_happened_ = false;
-        last_scheduled_read_ = nullptr;
-        throw read_exception_;
-    }
+    user_data.clear();
+    for (auto it = req.read_ext_data.begin(); it != req.read_ext_data.end(); ++it)
+        user_data.push_back(*it);
 
-    memcpy(buf, read_buffer_, len);
-
-    return len;
+    return req.read_bytes;
 }
 
 size_t Packet_Router::write(const void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout)
