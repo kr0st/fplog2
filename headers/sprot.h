@@ -139,6 +139,20 @@ namespace implementation
 
     const unsigned int Max_Frame_Size = 255;
     const unsigned int Mtu = Max_Frame_Size - sizeof (Frame);
+
+    inline bool crc_check(void* buffer, size_t sz)
+    {
+        if (sz < sizeof(Frame))
+            return false;
+
+        Frame frame;
+        memcpy(frame.bytes, buffer, sizeof(Frame));
+
+        if (frame.details.crc != 666)
+            return false;
+
+        return true;
+    }
 };
 
 };

@@ -23,6 +23,9 @@ void Packet_Router::reader_thread(Packet_Router* p)
             if (read_bytes < sizeof(implementation::Frame))
                 continue;
 
+            if (!implementation::crc_check(read_buffer, read_bytes))
+                continue;
+
             implementation::Frame frame;
             memcpy(frame.bytes, read_buffer, sizeof(implementation::Frame));
 
@@ -31,6 +34,9 @@ void Packet_Router::reader_thread(Packet_Router* p)
             Ip_Port tuple(read_ext_data);
 
             {
+                if (p->stop_reading_)
+                    return;
+
                 std::lock_guard lock(p->waitlist_mutex_);
 
                 if (p->waitlist_.find(tuple) != p->waitlist_.end())
@@ -53,9 +59,9 @@ void Packet_Router::reader_thread(Packet_Router* p)
                     req.wait = new std::condition_variable();
 
                 p->waitlist_[tuple] = req;
-            }
 
-            req.wait->notify_all();
+                req.wait->notify_all();
+            }
         }
         catch (std::exception&)
         {
@@ -181,7 +187,7 @@ size_t Packet_Router::read(void* buf, size_t buf_size, Extended_Data& user_data,
     if (!buf)
         THROWM(fplog::exceptions::Incorrect_Parameter, "Buffer for storing data cannot be missing calling read.");
 
-    if (buf_size < sizeof (implementation::Max_Frame_Size))
+    if (buf_size < sizeof (implementation::Frame))
         THROWM(fplog::exceptions::Incorrect_Parameter, "Buffer for storing data is too small.");
 
     Read_Request req(schedule_read(user_data, timeout));

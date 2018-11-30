@@ -116,6 +116,8 @@ TEST(L1_Transport_Test, Smoke_Test)
 
     std::thread sender([&]
     {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
         while (sending)
         {
             sprot::Packet_Router r2(&t2);
@@ -134,7 +136,6 @@ TEST(L1_Transport_Test, Smoke_Test)
     EXPECT_EQ(memcmp(message, recv_buf + sizeof(frame.bytes), strlen(message)), 0);
 
     sender.join();
-    return;
 }
 
 static std::mt19937 g_rng1(31337);
@@ -184,6 +185,8 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
     unsigned char send_buf[sprot::implementation::Max_Frame_Size];
     FILE* file = fopen(file_name.c_str(), "w");
 
+    sprot::Extended_Transport_Interface::Extended_Data recipient;
+
     try
     {
         while (bytes_written < bytes_to_write)
@@ -194,7 +197,8 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
             unsigned long current_bytes = 0;
             unsigned long how_much = (sprot::implementation::Max_Frame_Size < (bytes_to_write - bytes_written)) ? sprot::implementation::Max_Frame_Size :
                                                                                                                   (bytes_to_write - bytes_written);
-            sprot::Extended_Transport_Interface::Extended_Data recipient(fake_origin);
+
+            recipient = fake_origin;
             recipient[1] = static_cast<unsigned short>(real_recipient_listen_port);
 
             if (extended)
@@ -205,6 +209,8 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
             fwrite(send_buf, current_bytes, 1, file);
 
             bytes_written += current_bytes;
+
+            std::this_thread::sleep_for(std::chrono::microseconds(650));
         }
     }
     catch (fplog::exceptions::Generic_Exception& e)
@@ -358,7 +364,9 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
     reader2.join();
     reader3.join();
 
-    return;
+    EXPECT_TRUE(generic_util::compare_files("reader1.txt", "writer1.txt"));
+    EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
+    EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
 int main(int argc, char **argv)
