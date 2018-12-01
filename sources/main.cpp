@@ -103,7 +103,7 @@ TEST(L1_Transport_Test, Smoke_Test)
     memcpy(send_buf, frame.bytes, sizeof(frame.bytes));
     memcpy(send_buf + sizeof(frame.bytes), message, strlen(message));
 
-    sprot::Extended_Transport_Interface::Extended_Data recepient, origin;
+    sprot::Extended_Transport_Interface::Extended_Data recepient, origin, unknown_origin;
     recepient.push_back(static_cast<unsigned int>(0x0100007f));
     recepient.push_back(static_cast<unsigned short>(26260));
 
@@ -126,14 +126,33 @@ TEST(L1_Transport_Test, Smoke_Test)
     });
 
     size_t received_bytes = r1.read(recv_buf, sizeof (recv_buf), origin);
+
+    {
+        sprot::implementation::Frame received_frame;
+        memcpy(received_frame.bytes, recv_buf, sizeof(received_frame.bytes));
+
+        EXPECT_EQ(received_bytes, strlen(message) + sizeof (frame.bytes));
+        EXPECT_EQ(memcmp(frame.bytes, received_frame.bytes, sizeof(frame.bytes)), 0);
+        EXPECT_EQ(memcmp(message, recv_buf + sizeof(frame.bytes), strlen(message)), 0);
+    }
+
+    memset(recv_buf, 0, sizeof(recv_buf));
+
+    received_bytes = r1.read(recv_buf, sizeof (recv_buf), unknown_origin);
+
     sending = false;
 
-    sprot::implementation::Frame received_frame;
-    memcpy(received_frame.bytes, recv_buf, sizeof(received_frame.bytes));
+    {
+        sprot::implementation::Frame received_frame;
+        memcpy(received_frame.bytes, recv_buf, sizeof(received_frame.bytes));
 
-    EXPECT_EQ(received_bytes, strlen(message) + sizeof (frame.bytes));
-    EXPECT_EQ(memcmp(frame.bytes, received_frame.bytes, sizeof(frame.bytes)), 0);
-    EXPECT_EQ(memcmp(message, recv_buf + sizeof(frame.bytes), strlen(message)), 0);
+        EXPECT_EQ(received_bytes, strlen(message) + sizeof (frame.bytes));
+        EXPECT_EQ(memcmp(frame.bytes, received_frame.bytes, sizeof(frame.bytes)), 0);
+        EXPECT_EQ(memcmp(message, recv_buf + sizeof(frame.bytes), strlen(message)), 0);
+
+        sprot::Extended_Transport_Interface::Ip_Port tuple1(origin), tuple2(unknown_origin);
+        EXPECT_EQ(tuple1, tuple2);
+    }
 
     sender.join();
 }

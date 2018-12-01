@@ -53,6 +53,11 @@ class SPROT_API Extended_Transport_Interface
             Ip_Port(): ip(0), port(0) {}
             Ip_Port(Extended_Data& ext_data){ from_ext_data(ext_data); }
 
+            bool operator== (const Ip_Port& rhs) const
+            {
+                return (ip == rhs.ip) && (port == rhs.port);
+            }
+
             bool operator< (const Ip_Port& rhs) const
             {
                 if (ip == rhs.ip)
