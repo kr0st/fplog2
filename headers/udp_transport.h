@@ -38,7 +38,7 @@ class Udp_Transport: public sprot::Extended_Transport_Interface
             unsigned int ip;
         };
 
-        void enable(const Session_Manager::Params& params);
+        void enable(const Protocol_Interface::Params& params);
         void disable();
 
         virtual size_t read(void* buf, size_t buf_size, Extended_Data& user_data = no_extended_data, size_t timeout = infinite_wait);

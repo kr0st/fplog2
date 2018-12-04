@@ -5,7 +5,9 @@
 #include <map>
 #include <vector>
 #include <any>
-#include "fplog_exceptions.h"
+
+#include <fplog_exceptions.h>
+#include <utils.h>
 
 #ifdef _WIN32
 
@@ -39,6 +41,19 @@ class SPROT_API Basic_Transport_Interface
         virtual ~Basic_Transport_Interface() {}
 };
 
+class SPROT_API Protocol_Interface: Basic_Transport_Interface
+{
+    public:
+
+        typedef std::pair<std::string, std::string> Param;
+        typedef std::map<std::string, std::string> Params;
+
+        static Params empty_params;
+
+        virtual bool connect(Protocol_Interface::Params remote, size_t timeout = infinite_wait) = 0;
+        virtual bool accept(Protocol_Interface::Params remote, size_t timeout = infinite_wait) = 0;
+};
+
 class SPROT_API Extended_Transport_Interface
 {
     public:
@@ -67,13 +82,11 @@ class SPROT_API Extended_Transport_Interface
 
             Ip_Port& from_ext_data(Extended_Data& ext_data)
             {
-                if (ext_data.size() < 2)
-                {
-                    ip = 0;
-                    port = 0;
+                ip = 0;
+                port = 0;
 
+                if (ext_data.size() < 2)
                     return *this;
-                }
 
                 try
                 {
@@ -83,6 +96,48 @@ class SPROT_API Extended_Transport_Interface
                 catch (std::bad_cast&)
                 {
                     THROWM(fplog::exceptions::Incorrect_Parameter, "Provided extended data contains unexpected data.");
+                }
+
+                return *this;
+            }
+
+            Extended_Data to_ext_data()
+            {
+                Extended_Data ext_data;
+
+                ext_data.push_back(static_cast<unsigned int>(ip));
+                ext_data.push_back(static_cast<unsigned short>(port));
+
+                return ext_data;
+            }
+
+            Ip_Port& from_params(const Protocol_Interface::Params& params)
+            {
+                ip = 0;
+                port = 0;
+
+                if (params.size() < 2)
+                    return *this;
+
+                for (auto& param : params)
+                {
+                    if (generic_util::find_str_no_case(param.first, "ip"))
+                    {
+                        std::string ip_addr(param.second);
+                        ip_addr = generic_util::trim(ip_addr);
+
+                        auto tokens = generic_util::tokenize(ip_addr.c_str(), '.');
+
+                        for (auto& token : tokens)
+                        {
+                            unsigned short byte = static_cast<unsigned short>(std::stoi(token));
+                            ip += byte;
+                            ip <<= 8;
+                        }
+                    }
+
+                    if (generic_util::find_str_no_case(param.first, "port"))
+                        port = static_cast<unsigned short>(std::stoi(param.second));
                 }
 
                 return *this;
@@ -100,7 +155,6 @@ class SPROT_API Extended_Transport_Interface
         static bool null_data(const Extended_Data& user_data) { return (&user_data == &no_extended_data); }
 };
 
-
 class SPROT_API Session: public Basic_Transport_Interface
 {
     public:
@@ -113,13 +167,8 @@ class SPROT_API Session_Manager
 {
     public:
 
-        typedef std::pair<std::string, std::string> Param;
-        typedef std::map<std::string, std::string> Params;
-
-        static Params empty_params;
-
-        virtual Session* connect(const Params& from, const Params& to) = 0;
-        virtual Session* accept(const Params& config, size_t timeout = Session::infinite_wait) = 0;
+        virtual Session* connect(const Protocol_Interface::Params& local_config, const Protocol_Interface::Params& remote, size_t timeout = Session::infinite_wait) = 0;
+        virtual Session* accept(const Protocol_Interface::Params& local_config, const Protocol_Interface::Params& remote, size_t timeout = Session::infinite_wait) = 0;
 
         virtual ~Session_Manager();
 };
@@ -158,8 +207,7 @@ namespace implementation
 
         return true;
     }
-};
 
-};
+}};
 
 #endif // SPROT_H

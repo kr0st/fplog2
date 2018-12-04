@@ -25,8 +25,8 @@ TEST(Udp_Transport_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
-    sprot::Session_Manager::Params params;
-    sprot::Session_Manager::Param p;
+    sprot::Protocol_Interface::Params params;
+    sprot::Protocol_Interface::Param p;
 
     p.first = "ip";
     p.second = "127.0.0.1";
@@ -66,8 +66,8 @@ TEST(L1_Transport_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
-    sprot::Session_Manager::Params params;
-    sprot::Session_Manager::Param p;
+    sprot::Protocol_Interface::Params params;
+    sprot::Protocol_Interface::Param p;
 
     p.first = "ip";
     p.second = "127.0.0.1";
@@ -302,8 +302,8 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
-    sprot::Session_Manager::Params params;
-    sprot::Session_Manager::Param p;
+    sprot::Protocol_Interface::Params params;
+    sprot::Protocol_Interface::Param p;
 
     p.first = "ip";
     p.second = "127.0.0.1";

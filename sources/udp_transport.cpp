@@ -37,7 +37,7 @@ namespace sprot {
 
 Extended_Transport_Interface::Extended_Data Extended_Transport_Interface::no_extended_data;
 
-void Udp_Transport::enable(const Session_Manager::Params& params)
+void Udp_Transport::enable(const Protocol_Interface::Params& params)
 {
     static WSA_Up_Down sock_initer;
 
