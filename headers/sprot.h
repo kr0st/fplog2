@@ -191,6 +191,15 @@ namespace implementation
         unsigned char bytes[32];
     };
 
+    enum Frame_Type
+    {
+        Handshake_Frame = 0x13,
+        Goodbye_Frame,
+        Ack_Frame,
+        Data_Frame,
+        Retransmit_Frame
+    };
+
     const unsigned int Max_Frame_Size = 255;
     const unsigned int Mtu = Max_Frame_Size - sizeof (Frame);
 
