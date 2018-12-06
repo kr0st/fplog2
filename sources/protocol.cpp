@@ -19,7 +19,7 @@ class Protocol: Basic_Transport_Interface
     private:
 
         bool connected_;
-        Extended_Transport_Interface::Ip_Port endpoint_;
+        Extended_Transport_Interface::Address endpoint_;
 
         unsigned int sequence_;
         unsigned int op_timeout_;
@@ -45,7 +45,7 @@ class Protocol: Basic_Transport_Interface
         void send_ack(size_t timeout);
         void receive_ack(size_t timeout);
 };
-
+/*
 Protocol::~Protocol()
 {
     std::lock_guard lock(mutex_);
@@ -69,6 +69,6 @@ bool Protocol::connect(Protocol_Interface::Params params, size_t timeout)
 
     return connected_;
 }
-
+*/
 
 }}

@@ -35,7 +35,7 @@ class WSA_Up_Down
 
 namespace sprot {
 
-Extended_Transport_Interface::Extended_Data Extended_Transport_Interface::no_extended_data;
+Extended_Transport_Interface::Address Extended_Transport_Interface::no_address;
 
 void Udp_Transport::enable(const Protocol_Interface::Params& params)
 {
@@ -214,7 +214,7 @@ void Udp_Transport::disable()
     enabled_ = false;
 }
 
-size_t Udp_Transport::read(void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout)
+size_t Udp_Transport::read(void* buf, size_t buf_size, Address& user_data, size_t timeout)
 {
     std::lock_guard<std::recursive_mutex> lock(read_mutex_);
 
@@ -273,10 +273,8 @@ retry:
     {
         if (!null_data(user_data))
         {
-            user_data.clear();
-
-            user_data.push_back(remote_addr.sin_addr.s_addr);
-            user_data.push_back(ntohs(remote_addr.sin_port));
+            user_data.ip = remote_addr.sin_addr.s_addr;
+            user_data.port = ntohs(remote_addr.sin_port);
         }
 
         return static_cast<size_t>(res);
@@ -285,7 +283,7 @@ retry:
         THROW(fplog::exceptions::Read_Failed);
 }
 
-size_t Udp_Transport::write(const void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout)
+size_t Udp_Transport::write(const void* buf, size_t buf_size, Address& user_data, size_t timeout)
 {
     std::lock_guard<std::recursive_mutex> lock(write_mutex_);
 
@@ -310,21 +308,11 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, Extended_Data& use
         ((char*)&(remote_addr.sin_addr.s_addr))[3] = ip_[3];
     }
 */
-    if (user_data.size() != 2)
-        THROWM(fplog::exceptions::Incorrect_Parameter, "Missing or incomplete information about receiver.");
-
     Ip_Address remote;
     unsigned short port;
 
-    try
-    {
-        remote.ip = std::any_cast<unsigned int>(user_data[0]);
-        port = htons(std::any_cast<unsigned short>(user_data[1]));
-    }
-    catch (std::bad_cast&)
-    {
-        THROWM(fplog::exceptions::Incorrect_Parameter, "Missing or incomplete information about receiver.");
-    }
+    remote.ip = user_data.ip;
+    port = htons(user_data.port);
 
     remote_addr.sin_addr.s_addr = remote.ip;
     remote_addr.sin_port = port;

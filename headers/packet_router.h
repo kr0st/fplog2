@@ -17,8 +17,8 @@ class Packet_Router: public Extended_Transport_Interface
 
         Packet_Router(Extended_Transport_Interface* l0_transport);
 
-        virtual size_t read(void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout = infinite_wait);
-        virtual size_t write(const void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout = infinite_wait);
+        virtual size_t read(void* buf, size_t buf_size, Address& user_data, size_t timeout = infinite_wait);
+        virtual size_t write(const void* buf, size_t buf_size, Address& user_data, size_t timeout = infinite_wait);
 
         ~Packet_Router();
 
@@ -33,13 +33,13 @@ class Packet_Router: public Extended_Transport_Interface
             size_t read_bytes = 0;
             std::mutex* mutex = nullptr;
             std::condition_variable* wait = nullptr;
-            Extended_Data read_ext_data;
+            Address read_ext_data;
         };
 
-        std::map<Ip_Port, Read_Request> waitlist_;
+        std::map<Address, Read_Request> waitlist_;
         std::mutex waitlist_mutex_;
 
-        Read_Request schedule_read(Extended_Data& user_data, size_t timeout = infinite_wait);
+        Read_Request schedule_read(Address& user_data, size_t timeout = infinite_wait);
 
         static void reader_thread(Packet_Router* p);
         std::thread reader_;

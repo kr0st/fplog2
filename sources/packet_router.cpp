@@ -11,15 +11,13 @@ void Packet_Router::reader_thread(Packet_Router* p)
 
     while (!p->stop_reading_)
     {
-        Extended_Data read_ext_data;
+        Address read_ext_data;
         Read_Request req;
 
         try
         {
             unsigned long read_bytes = p->l0_transport_->read(read_buffer, sizeof(read_buffer), read_ext_data, 500);
 
-            if (read_ext_data.size() < 2)
-                continue;
             if (read_bytes < sizeof(implementation::Frame))
                 continue;
 
@@ -29,9 +27,9 @@ void Packet_Router::reader_thread(Packet_Router* p)
             implementation::Frame frame;
             memcpy(frame.bytes, read_buffer, sizeof(implementation::Frame));
 
-            read_ext_data[1] = static_cast<unsigned short>(frame.details.origin_listen_port);
+            read_ext_data.port = frame.details.origin_listen_port;
 
-            Ip_Port tuple(read_ext_data);
+            Address tuple(read_ext_data);
 
             {
                 if (p->stop_reading_)
@@ -43,7 +41,7 @@ void Packet_Router::reader_thread(Packet_Router* p)
                     req = p->waitlist_[tuple];
                 else
                 {
-                    Ip_Port empty_tuple;
+                    Address empty_tuple;
                     if (p->waitlist_.find(empty_tuple) != p->waitlist_.end())
                         req = p->waitlist_[empty_tuple];
                     tuple = empty_tuple;
@@ -81,10 +79,10 @@ stop_reading_(false)
 {
 }
 
-Packet_Router::Read_Request Packet_Router::schedule_read(Extended_Data& user_data, size_t timeout)
+Packet_Router::Read_Request Packet_Router::schedule_read(Address& user_data, size_t timeout)
 {   
     Read_Request req;
-    Ip_Port tuple(user_data);
+    Address tuple(user_data);
 
     std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start(std::chrono::system_clock::now());
     auto check_time_out = [&timeout, &timer_start]()
@@ -101,7 +99,7 @@ Packet_Router::Read_Request Packet_Router::schedule_read(Extended_Data& user_dat
 
     {
         std::lock_guard lock(waitlist_mutex_);
-        std::map<Ip_Port, Read_Request>::iterator res(waitlist_.find(tuple));
+        std::map<Address, Read_Request>::iterator res(waitlist_.find(tuple));
 
         if ( res != waitlist_.end())
             duplicate = true;
@@ -123,7 +121,7 @@ Packet_Router::Read_Request Packet_Router::schedule_read(Extended_Data& user_dat
         check_time_out();
 
         std::lock_guard lock(waitlist_mutex_);
-        std::map<Ip_Port, Read_Request>::iterator res(waitlist_.find(tuple));
+        std::map<Address, Read_Request>::iterator res(waitlist_.find(tuple));
 
         if (res != waitlist_.end())
             duplicate = true;
@@ -145,7 +143,7 @@ Packet_Router::Read_Request Packet_Router::schedule_read(Extended_Data& user_dat
 
         std::lock_guard lock(waitlist_mutex_);
 
-        std::map<Ip_Port, Read_Request>::iterator res(waitlist_.find(tuple));
+        std::map<Address, Read_Request>::iterator res(waitlist_.find(tuple));
 
         delete res->second.wait;
         delete res->second.mutex;
@@ -161,7 +159,7 @@ Packet_Router::Read_Request Packet_Router::schedule_read(Extended_Data& user_dat
 
     {
         std::lock_guard lock(waitlist_mutex_);
-        std::map<Ip_Port, Read_Request>::iterator res(waitlist_.find(tuple));
+        std::map<Address, Read_Request>::iterator res(waitlist_.find(tuple));
 
         delete res->second.wait;
         delete res->second.mutex;
@@ -176,7 +174,7 @@ Packet_Router::Read_Request Packet_Router::schedule_read(Extended_Data& user_dat
     return req;
 }
 
-size_t Packet_Router::read(void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout)
+size_t Packet_Router::read(void* buf, size_t buf_size, Address& user_data, size_t timeout)
 {
     if (!l0_transport_)
         THROW(fplog::exceptions::Transport_Missing);
@@ -194,14 +192,13 @@ size_t Packet_Router::read(void* buf, size_t buf_size, Extended_Data& user_data,
 
     memcpy(buf, req.read_buffer, req.read_bytes);
 
-    user_data.clear();
-    for (auto it = req.read_ext_data.begin(); it != req.read_ext_data.end(); ++it)
-        user_data.push_back(*it);
+    user_data.ip = req.read_ext_data.ip;
+    user_data.port = req.read_ext_data.port;
 
     return req.read_bytes;
 }
 
-size_t Packet_Router::write(const void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout)
+size_t Packet_Router::write(const void* buf, size_t buf_size, Address& user_data, size_t timeout)
 {
     if (buf_size == 0)
         return 0;
@@ -214,9 +211,6 @@ size_t Packet_Router::write(const void* buf, size_t buf_size, Extended_Data& use
 
     if (!buf)
         THROWM(fplog::exceptions::Incorrect_Parameter, "Buffer for sending data cannot be missing calling write.");
-
-    if(user_data.size() < 2)
-        THROWM(fplog::exceptions::Incorrect_Parameter, "Not enough information about recipient.");
 
     return l0_transport_->write(buf, buf_size, user_data, timeout);
 }

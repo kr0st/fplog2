@@ -58,60 +58,26 @@ class SPROT_API Extended_Transport_Interface
 {
     public:
 
-        typedef std::vector<std::any> Extended_Data;
-
-        struct Ip_Port
+        struct Address
         {
             unsigned int ip;
             unsigned short port;
 
-            Ip_Port(): ip(0), port(0) {}
-            Ip_Port(Extended_Data& ext_data){ from_ext_data(ext_data); }
+            Address(): ip(0), port(0) {}
 
-            bool operator== (const Ip_Port& rhs) const
+            bool operator== (const Address& rhs) const
             {
                 return (ip == rhs.ip) && (port == rhs.port);
             }
 
-            bool operator< (const Ip_Port& rhs) const
+            bool operator< (const Address& rhs) const
             {
                 if (ip == rhs.ip)
                     return (port < rhs.port);
                 return (ip < rhs.ip);
             }
 
-            Ip_Port& from_ext_data(Extended_Data& ext_data)
-            {
-                ip = 0;
-                port = 0;
-
-                if (ext_data.size() < 2)
-                    return *this;
-
-                try
-                {
-                    ip = std::any_cast<unsigned int>(ext_data[0]);
-                    port = std::any_cast<unsigned short>(ext_data[1]);
-                }
-                catch (std::bad_cast&)
-                {
-                    THROWM(fplog::exceptions::Incorrect_Parameter, "Provided extended data contains unexpected data.");
-                }
-
-                return *this;
-            }
-
-            Extended_Data to_ext_data()
-            {
-                Extended_Data ext_data;
-
-                ext_data.push_back(static_cast<unsigned int>(ip));
-                ext_data.push_back(static_cast<unsigned short>(port));
-
-                return ext_data;
-            }
-
-            Ip_Port& from_params(const Protocol_Interface::Params& params)
+            Address& from_params(const Protocol_Interface::Params& params)
             {
                 ip = 0;
                 port = 0;
@@ -144,15 +110,15 @@ class SPROT_API Extended_Transport_Interface
             }
         };
 
-        static Extended_Data no_extended_data;
+        static Address no_address;
         static const size_t infinite_wait = 4294967295;
 
-        virtual size_t read(void* buf, size_t buf_size, Extended_Data& user_data = no_extended_data, size_t timeout = infinite_wait) = 0;
-        virtual size_t write(const void* buf, size_t buf_size, Extended_Data& user_data = no_extended_data, size_t timeout = infinite_wait) = 0;
+        virtual size_t read(void* buf, size_t buf_size, Address& user_data = no_address, size_t timeout = infinite_wait) = 0;
+        virtual size_t write(const void* buf, size_t buf_size, Address& user_data = no_address, size_t timeout = infinite_wait) = 0;
 
         virtual ~Extended_Transport_Interface() {}
 
-        static bool null_data(const Extended_Data& user_data) { return (&user_data == &no_extended_data); }
+        static bool null_data(const Address& user_data) { return (&user_data == &no_address); }
 };
 
 class SPROT_API Session: public Basic_Transport_Interface
@@ -201,7 +167,7 @@ namespace implementation
     };
 
     const unsigned int Max_Frame_Size = 255;
-    const unsigned int Mtu = Max_Frame_Size - sizeof (Frame);
+    const unsigned int Mtu = Max_Frame_Size - sizeof(Frame);
 
     inline bool crc_check(void* buffer, size_t sz)
     {

@@ -41,8 +41,8 @@ class Udp_Transport: public sprot::Extended_Transport_Interface
         void enable(const Protocol_Interface::Params& params);
         void disable();
 
-        virtual size_t read(void* buf, size_t buf_size, Extended_Data& user_data = no_extended_data, size_t timeout = infinite_wait);
-        virtual size_t write(const void* buf, size_t buf_size, Extended_Data& user_data, size_t timeout = infinite_wait);
+        virtual size_t read(void* buf, size_t buf_size, Address& user_data = no_address, size_t timeout = infinite_wait);
+        virtual size_t write(const void* buf, size_t buf_size, Address& user_data, size_t timeout = infinite_wait);
 
         Udp_Transport();
         virtual ~Udp_Transport();

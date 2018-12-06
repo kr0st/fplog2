@@ -51,9 +51,9 @@ TEST(Udp_Transport_Test, Smoke_Test)
     char* message = "hello world?";
     memcpy(send_buf, message, strlen(message));
 
-    sprot::Extended_Transport_Interface::Extended_Data recepient, origin;
-    recepient.push_back(static_cast<unsigned int>(0x0100007f));
-    recepient.push_back(static_cast<unsigned short>(26259));
+    sprot::Extended_Transport_Interface::Address recepient, origin;
+    recepient.ip = 0x0100007f;
+    recepient.port = 26259;
 
     t1.write(send_buf, strlen(message), recepient);
 
@@ -103,12 +103,12 @@ TEST(L1_Transport_Test, Smoke_Test)
     memcpy(send_buf, frame.bytes, sizeof(frame.bytes));
     memcpy(send_buf + sizeof(frame.bytes), message, strlen(message));
 
-    sprot::Extended_Transport_Interface::Extended_Data recepient, origin, unknown_origin;
-    recepient.push_back(static_cast<unsigned int>(0x0100007f));
-    recepient.push_back(static_cast<unsigned short>(26260));
+    sprot::Extended_Transport_Interface::Address recepient, origin, unknown_origin;
+    recepient.ip = 0x0100007f;
+    recepient.port = 26260;
 
-    origin.push_back(static_cast<unsigned int>(0x0100007f));
-    origin.push_back(static_cast<unsigned short>(26261));
+    origin.ip = 0x0100007f;
+    origin.port = 26261;
 
 
     sprot::Packet_Router r1(&t1);
@@ -150,7 +150,7 @@ TEST(L1_Transport_Test, Smoke_Test)
         EXPECT_EQ(memcmp(frame.bytes, received_frame.bytes, sizeof(frame.bytes)), 0);
         EXPECT_EQ(memcmp(message, recv_buf + sizeof(frame.bytes), strlen(message)), 0);
 
-        sprot::Extended_Transport_Interface::Ip_Port tuple1(origin), tuple2(unknown_origin);
+        sprot::Extended_Transport_Interface::Address tuple1(origin), tuple2(unknown_origin);
         EXPECT_EQ(tuple1, tuple2);
     }
 
@@ -185,7 +185,7 @@ unsigned short fill_buffer_with_frame_and_random_data(unsigned char* buf, unsign
 
 unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_name, std::mt19937* rng, sprot::Basic_Transport_Interface* basic = nullptr,
                                  sprot::Extended_Transport_Interface* extended = nullptr,
-                                 sprot::Extended_Transport_Interface::Extended_Data& fake_origin = sprot::Extended_Transport_Interface::no_extended_data,
+                                 sprot::Extended_Transport_Interface::Address& fake_origin = sprot::Extended_Transport_Interface::no_address,
                                  unsigned short real_recipient_listen_port = 0)
 {
     if (bytes_to_write == 0)
@@ -204,13 +204,13 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
     unsigned char send_buf[sprot::implementation::Max_Frame_Size];
     FILE* file = fopen(file_name.c_str(), "w");
 
-    sprot::Extended_Transport_Interface::Extended_Data recipient;
+    sprot::Extended_Transport_Interface::Address recipient;
 
     try
     {
         while (bytes_written < bytes_to_write)
         {
-            sprot::Extended_Transport_Interface::Ip_Port fake_ip_port(fake_origin);
+            sprot::Extended_Transport_Interface::Address fake_ip_port(fake_origin);
             fill_buffer_with_frame_and_random_data(send_buf, sprot::implementation::Max_Frame_Size, fake_ip_port.port, fake_ip_port.ip, rng);
 
             unsigned long current_bytes = 0;
@@ -218,7 +218,7 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
                                                                                                                   (bytes_to_write - bytes_written);
 
             recipient = fake_origin;
-            recipient[1] = static_cast<unsigned short>(real_recipient_listen_port);
+            recipient.port = real_recipient_listen_port;
 
             if (extended)
                 current_bytes = extended->write(send_buf, how_much, recipient, 5000);
@@ -250,7 +250,7 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
 
 unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_name, sprot::Basic_Transport_Interface* basic = nullptr,
                          sprot::Extended_Transport_Interface* extended = nullptr,
-                         sprot::Extended_Transport_Interface::Extended_Data& origin = sprot::Extended_Transport_Interface::no_extended_data)
+                         sprot::Extended_Transport_Interface::Address& origin = sprot::Extended_Transport_Interface::no_address)
 {
     if (bytes_to_read == 0)
         return 0;
@@ -326,25 +326,25 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
     unsigned long sent_bytes1 = 0, sent_bytes2 = 0, sent_bytes3 = 0;
 
     std::thread reader1([&]{
-        sprot::Extended_Transport_Interface::Extended_Data origin_data;
-        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
-        origin_data.push_back(static_cast<unsigned short>(26262));
+        sprot::Extended_Transport_Interface::Address origin_data;
+        origin_data.ip = 0x0100007f;
+        origin_data.port = 26262;
 
         read_bytes1 = read_from_transport(5242880, std::string("reader1.txt"), nullptr, &r1, origin_data);
     });
 
     std::thread reader2([&]{
-        sprot::Extended_Transport_Interface::Extended_Data origin_data;
-        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
-        origin_data.push_back(static_cast<unsigned short>(26263));
+        sprot::Extended_Transport_Interface::Address origin_data;
+        origin_data.ip = 0x0100007f;
+        origin_data.port = 26263;
 
         read_bytes2 = read_from_transport(5242880, std::string("reader2.txt"), nullptr, &r1, origin_data);
     });
 
     std::thread reader3([&]{
-        sprot::Extended_Transport_Interface::Extended_Data origin_data;
-        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
-        origin_data.push_back(static_cast<unsigned short>(26264));
+        sprot::Extended_Transport_Interface::Address origin_data;
+        origin_data.ip = 0x0100007f;
+        origin_data.port = 26264;
 
         read_bytes3 = read_from_transport(5242880, std::string("reader3.txt"), nullptr, &r1, origin_data);
     });
@@ -352,25 +352,25 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
     std::thread writer1([&]{
-        sprot::Extended_Transport_Interface::Extended_Data origin_data;
-        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
-        origin_data.push_back(static_cast<unsigned short>(26262));
+        sprot::Extended_Transport_Interface::Address origin_data;
+        origin_data.ip = 0x0100007f;
+        origin_data.port = 26262;
 
         sent_bytes1 = write_to_transport(5242880, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer2([&]{
-        sprot::Extended_Transport_Interface::Extended_Data origin_data;
-        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
-        origin_data.push_back(static_cast<unsigned short>(26263));
+        sprot::Extended_Transport_Interface::Address origin_data;
+        origin_data.ip = 0x0100007f;
+        origin_data.port = 26263;
 
         sent_bytes2 = write_to_transport(5242880, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer3([&]{
-        sprot::Extended_Transport_Interface::Extended_Data origin_data;
-        origin_data.push_back(static_cast<unsigned int>(0x0100007f));
-        origin_data.push_back(static_cast<unsigned short>(26264));
+        sprot::Extended_Transport_Interface::Address origin_data;
+        origin_data.ip = 0x0100007f;
+        origin_data.port = 26264;
 
         sent_bytes3 = write_to_transport(5242880, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data, 26260);
     });
