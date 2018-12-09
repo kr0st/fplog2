@@ -116,13 +116,11 @@ TEST(L1_Transport_Test, Smoke_Test)
 
     std::thread sender([&]
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        sprot::Packet_Router r2(&t2);
 
         while (sending)
-        {
-            sprot::Packet_Router r2(&t2);
             r2.write(send_buf, strlen(message) + sizeof (frame.bytes), recepient);
-        }
     });
 
     size_t received_bytes = r1.read(recv_buf, sizeof (recv_buf), origin);
@@ -211,7 +209,7 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
         while (bytes_written < bytes_to_write)
         {
             sprot::Extended_Transport_Interface::Address fake_ip_port(fake_origin);
-            fill_buffer_with_frame_and_random_data(send_buf, sprot::implementation::Max_Frame_Size, fake_ip_port.port, fake_ip_port.ip, rng);
+            fill_buffer_with_frame_and_random_data(send_buf, sprot::implementation::Max_Frame_Size - sizeof(sprot::implementation::Frame), fake_ip_port.port, fake_ip_port.ip, rng);
 
             unsigned long current_bytes = 0;
             unsigned long how_much = (sprot::implementation::Max_Frame_Size < (bytes_to_write - bytes_written)) ? sprot::implementation::Max_Frame_Size :

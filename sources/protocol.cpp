@@ -1,3 +1,4 @@
+#include <mutex>
 #include <sprot.h>
 
 namespace sprot { namespace implementation {

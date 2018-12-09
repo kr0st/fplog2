@@ -43,8 +43,12 @@ void Packet_Router::reader_thread(Packet_Router* p)
                 {
                     Address empty_tuple;
                     if (p->waitlist_.find(empty_tuple) != p->waitlist_.end())
+                    {
                         req = p->waitlist_[empty_tuple];
-                    tuple = empty_tuple;
+                        tuple = empty_tuple;
+                    }
+                    else
+                        continue;
                 }
 
                 req.read_bytes = read_bytes;
@@ -70,12 +74,15 @@ void Packet_Router::reader_thread(Packet_Router* p)
             continue;
         }
     }
+
+    bool ending_now;
+    ending_now = true;
 }
 
 Packet_Router::Packet_Router(Extended_Transport_Interface* l0_transport):
 l0_transport_(l0_transport),
-reader_(std::bind(Packet_Router::reader_thread, this)),
-stop_reading_(false)
+stop_reading_(false),
+reader_(std::bind(Packet_Router::reader_thread, this))
 {
 }
 
