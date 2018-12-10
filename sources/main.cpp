@@ -227,7 +227,7 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
 
             bytes_written += current_bytes;
 
-            std::this_thread::sleep_for(std::chrono::microseconds(650));
+            std::this_thread::sleep_for(std::chrono::microseconds(1000));
         }
     }
     catch (fplog::exceptions::Generic_Exception& e)

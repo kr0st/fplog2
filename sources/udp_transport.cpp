@@ -314,8 +314,12 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, Address& user_data
     remote.ip = user_data.ip;
     port = htons(user_data.port);
 
+    memset(&remote_addr, 0, sizeof(remote_addr));
+
+    remote_addr.sin_family = AF_INET;
     remote_addr.sin_addr.s_addr = remote.ip;
     remote_addr.sin_port = port;
+
 
     fd_set fdset;
 
