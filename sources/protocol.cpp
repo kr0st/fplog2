@@ -14,7 +14,13 @@ class Protocol: Basic_Transport_Interface
         bool accept(Protocol_Interface::Params params, size_t timeout = infinite_wait);
 
         Protocol(Extended_Transport_Interface* l1_transport);
-        virtual ~Protocol();
+
+        virtual ~Protocol()
+        {
+            std::lock_guard lock(mutex_);
+            send_goodbye(op_timeout_);
+            connected_ = false;
+        }
 
 
     private:
@@ -46,12 +52,41 @@ class Protocol: Basic_Transport_Interface
         void send_ack(size_t timeout);
         void receive_ack(size_t timeout);
 };
-/*
-Protocol::~Protocol()
+
+void send_frame(size_t timeout);
+void receive_frame(size_t timeout);
+
+Frame_Type frame_type(void* buffer)
 {
-    std::lock_guard lock(mutex_);
-    send_goodbye(op_timeout_);
-    connected_ = false;
+    return Frame_Type::Unknown_Frame;
+}
+
+void make_frame(Frame_Type type, size_t data_len = 0, void* data = nullptr)
+{
+}
+
+void Protocol::send_handshake(size_t timeout)
+{
+}
+
+void Protocol::receive_handshake(size_t timeout)
+{
+}
+
+void Protocol::send_goodbye(size_t timeout)
+{
+}
+
+void Protocol::receive_goodbye(size_t timeout)
+{
+}
+
+void Protocol::send_ack(size_t timeout)
+{
+}
+
+void Protocol::receive_ack(size_t timeout)
+{
 }
 
 bool Protocol::connect(Protocol_Interface::Params params, size_t timeout)
@@ -70,6 +105,6 @@ bool Protocol::connect(Protocol_Interface::Params params, size_t timeout)
 
     return connected_;
 }
-*/
+
 
 }}

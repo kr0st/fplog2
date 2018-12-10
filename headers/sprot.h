@@ -163,7 +163,8 @@ namespace implementation
         Goodbye_Frame,
         Ack_Frame,
         Data_Frame,
-        Retransmit_Frame
+        Retransmit_Frame,
+        Unknown_Frame
     };
 
     const unsigned int Max_Frame_Size = 255;
