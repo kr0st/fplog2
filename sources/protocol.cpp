@@ -53,8 +53,14 @@ class Protocol: Basic_Transport_Interface
         void receive_ack(size_t timeout);
 };
 
-void send_frame(size_t timeout);
-void receive_frame(size_t timeout);
+void send_frame(size_t timeout)
+{
+    auto timer_start(sprot::implementation::check_time_out(timeout));
+}
+
+void receive_frame(size_t timeout)
+{
+}
 
 Frame_Type frame_type(void* buffer)
 {
@@ -63,6 +69,8 @@ Frame_Type frame_type(void* buffer)
 
 void make_frame(Frame_Type type, size_t data_len = 0, void* data = nullptr)
 {
+    if (type > Frame_Type::Unknown_Frame)
+        THROW1(exceptions::Unknown_Frame, type);
 }
 
 void Protocol::send_handshake(size_t timeout)

@@ -91,16 +91,7 @@ Packet_Router::Read_Request Packet_Router::schedule_read(Address& user_data, siz
     Read_Request req;
     Address tuple(user_data);
 
-    std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start(std::chrono::system_clock::now());
-    auto check_time_out = [&timeout, &timer_start]()
-    {
-        auto timer_start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(timer_start);
-        auto timer_stop_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
-        std::chrono::milliseconds timeout_ms(timeout);
-
-        if (timer_stop_ms - timer_start_ms >= timeout_ms)
-            THROW(fplog::exceptions::Timeout);
-    };
+    auto timer_start(sprot::implementation::check_time_out(timeout));
 
     bool duplicate = false;
 
@@ -125,7 +116,7 @@ Packet_Router::Read_Request Packet_Router::schedule_read(Address& user_data, siz
     while (duplicate)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        check_time_out();
+        sprot::implementation::check_time_out(timeout, timer_start);
 
         std::lock_guard lock(waitlist_mutex_);
         std::map<Address, Read_Request>::iterator res(waitlist_.find(tuple));

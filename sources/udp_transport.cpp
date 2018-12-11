@@ -221,21 +221,6 @@ size_t Udp_Transport::read(void* buf, size_t buf_size, Address& user_data, size_
     if (!enabled_)
         THROW(fplog::exceptions::Read_Failed);
 
-    time_point<system_clock, system_clock::duration> timer_start(system_clock::now());
-    auto check_time_out = [&timeout, &timer_start]()
-    {
-        auto timer_start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(timer_start);
-        auto timer_stop_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
-        std::chrono::milliseconds timeout_ms(timeout);
-
-        if (timer_stop_ms - timer_start_ms >= timeout_ms)
-            THROW(fplog::exceptions::Timeout);
-    };
-
-retry:
-
-    check_time_out();
-
     sockaddr_in remote_addr;
     int addr_len = sizeof(remote_addr);
 

@@ -4,7 +4,7 @@
 #include <string>
 #include <map>
 #include <vector>
-#include <any>
+#include <chrono>
 
 #include <fplog_exceptions.h>
 #include <utils.h>
@@ -139,6 +139,22 @@ class SPROT_API Session_Manager
         virtual ~Session_Manager();
 };
 
+namespace exceptions
+{
+    class Unknown_Frame : public fplog::exceptions::Generic_Exception
+    {
+        public:
+
+            Unknown_Frame(const char* facility, const char* file, int line, int frame_type):
+                Generic_Exception(facility, file, line)
+            {
+                char str[40];
+                sprintf(str, "Unknown frame type %d detected.", frame_type);
+                message_ = str;
+            }
+    };
+};
+
 namespace implementation
 {
     union Frame
@@ -183,6 +199,19 @@ namespace implementation
 
         return true;
     }
+
+    inline auto check_time_out(unsigned long long timeout,
+                               std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start = std::chrono::system_clock::now())
+    {
+        auto timer_start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(timer_start);
+        auto timer_stop_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+        std::chrono::milliseconds timeout_ms(timeout);
+
+        if (timer_stop_ms - timer_start_ms >= timeout_ms)
+            THROW(fplog::exceptions::Timeout);
+
+        return timer_start;
+    };
 
 }};
 
