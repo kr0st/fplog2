@@ -36,6 +36,8 @@ inline void hash_combine(std::size_t& seed, T const& v)
 namespace generic_util
 {
 
+uint16_t gen_crc16(const uint8_t *data, uint16_t size);
+
 template<typename InputIterator1, typename InputIterator2>
 bool
 range_equal(InputIterator1 first1, InputIterator1 last1,

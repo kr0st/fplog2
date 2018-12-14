@@ -18,14 +18,14 @@ void Packet_Router::reader_thread(Packet_Router* p)
         {
             unsigned long read_bytes = p->l0_transport_->read(read_buffer, sizeof(read_buffer), read_ext_data, 500);
 
-            if (read_bytes < sizeof(implementation::Frame))
+            if (read_bytes < sizeof(implementation::Frame::bytes))
                 continue;
 
             if (!implementation::crc_check(read_buffer, read_bytes))
                 continue;
 
             implementation::Frame frame;
-            memcpy(frame.bytes, read_buffer, sizeof(implementation::Frame));
+            memcpy(frame.bytes, read_buffer, sizeof(implementation::Frame::bytes));
 
             read_ext_data.port = frame.details.origin_listen_port;
 
@@ -183,7 +183,7 @@ size_t Packet_Router::read(void* buf, size_t buf_size, Address& user_data, size_
     if (!buf)
         THROWM(fplog::exceptions::Incorrect_Parameter, "Buffer for storing data cannot be missing calling read.");
 
-    if (buf_size < sizeof (implementation::Frame))
+    if (buf_size < sizeof(implementation::Frame::bytes))
         THROWM(fplog::exceptions::Incorrect_Parameter, "Buffer for storing data is too small.");
 
     Read_Request req(schedule_read(user_data, timeout));

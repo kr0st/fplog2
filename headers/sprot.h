@@ -165,12 +165,12 @@ namespace implementation
             unsigned short type;
             unsigned int origin_ip;
             unsigned short origin_listen_port;
-            char hostname[16];
+            char hostname[18];
             unsigned int sequence;
             unsigned short data_len;
         } details;
 
-        unsigned char bytes[32];
+        unsigned char bytes[36];
     };
 
     enum Frame_Type
@@ -184,17 +184,17 @@ namespace implementation
     };
 
     const unsigned int Max_Frame_Size = 255;
-    const unsigned int Mtu = Max_Frame_Size - sizeof(Frame);
+    const unsigned int Mtu = Max_Frame_Size - sizeof(Frame::bytes);
 
     inline bool crc_check(void* buffer, size_t sz)
     {
-        if (sz < sizeof(Frame))
+        if (sz < sizeof(Frame::bytes))
             return false;
 
-        Frame frame;
-        memcpy(frame.bytes, buffer, sizeof(Frame));
+        unsigned short crc_expected = generic_util::gen_crc16(static_cast<unsigned char*>(buffer) + 2, static_cast<unsigned short>(sz) - 2);
+        unsigned short* crc_actual = static_cast<unsigned short*>(buffer);
 
-        if (frame.details.crc != 666)
+        if (*crc_actual != crc_expected)
             return false;
 
         return true;
