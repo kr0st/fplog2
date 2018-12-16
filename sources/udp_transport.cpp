@@ -35,9 +35,7 @@ class WSA_Up_Down
 
 namespace sprot {
 
-Extended_Transport_Interface::Address Extended_Transport_Interface::no_address;
-
-void Udp_Transport::enable(const Protocol_Interface::Params& params)
+void Udp_Transport::enable(const Params& params)
 {
     static WSA_Up_Down sock_initer;
 

@@ -27,6 +27,7 @@
 
 #define THROW(exception_type) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__); }
 #define THROW1(exception_type, param1) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, param1); }
+#define THROW2(exception_type, param1, param2) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, param1, param2); }
 #define THROWM(exception_type, message) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, message); }
 
 #ifdef __linux__

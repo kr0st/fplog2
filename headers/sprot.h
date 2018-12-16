@@ -29,6 +29,65 @@
 
 namespace sprot {
 
+typedef std::pair<std::string, std::string> Param;
+typedef std::map<std::string, std::string> Params;
+
+static Params empty_params;
+
+struct Address
+{
+    unsigned int ip;
+    unsigned short port;
+
+    Address(): ip(0), port(0) {}
+
+    bool operator== (const Address& rhs) const
+    {
+        return (ip == rhs.ip) && (port == rhs.port);
+    }
+
+    bool operator< (const Address& rhs) const
+    {
+        if (ip == rhs.ip)
+            return (port < rhs.port);
+        return (ip < rhs.ip);
+    }
+
+    Address& from_params(const Params& params)
+    {
+        ip = 0;
+        port = 0;
+
+        if (params.size() < 2)
+            return *this;
+
+        for (auto& param : params)
+        {
+            if (generic_util::find_str_no_case(param.first, "ip"))
+            {
+                std::string ip_addr(param.second);
+                ip_addr = generic_util::trim(ip_addr);
+
+                auto tokens = generic_util::tokenize(ip_addr.c_str(), '.');
+
+                for (auto& token : tokens)
+                {
+                    unsigned short byte = static_cast<unsigned short>(std::stoi(token));
+                    ip += byte;
+                    ip <<= 8;
+                }
+            }
+
+            if (generic_util::find_str_no_case(param.first, "port"))
+                port = static_cast<unsigned short>(std::stoi(param.second));
+        }
+
+        return *this;
+    }
+};
+
+static Address no_address;
+
 class SPROT_API Basic_Transport_Interface
 {
     public:
@@ -41,76 +100,10 @@ class SPROT_API Basic_Transport_Interface
         virtual ~Basic_Transport_Interface() {}
 };
 
-class SPROT_API Protocol_Interface: Basic_Transport_Interface
-{
-    public:
-
-        typedef std::pair<std::string, std::string> Param;
-        typedef std::map<std::string, std::string> Params;
-
-        static Params empty_params;
-
-        virtual bool connect(Protocol_Interface::Params remote, size_t timeout = infinite_wait) = 0;
-        virtual bool accept(Protocol_Interface::Params remote, size_t timeout = infinite_wait) = 0;
-};
-
 class SPROT_API Extended_Transport_Interface
 {
     public:
 
-        struct Address
-        {
-            unsigned int ip;
-            unsigned short port;
-
-            Address(): ip(0), port(0) {}
-
-            bool operator== (const Address& rhs) const
-            {
-                return (ip == rhs.ip) && (port == rhs.port);
-            }
-
-            bool operator< (const Address& rhs) const
-            {
-                if (ip == rhs.ip)
-                    return (port < rhs.port);
-                return (ip < rhs.ip);
-            }
-
-            Address& from_params(const Protocol_Interface::Params& params)
-            {
-                ip = 0;
-                port = 0;
-
-                if (params.size() < 2)
-                    return *this;
-
-                for (auto& param : params)
-                {
-                    if (generic_util::find_str_no_case(param.first, "ip"))
-                    {
-                        std::string ip_addr(param.second);
-                        ip_addr = generic_util::trim(ip_addr);
-
-                        auto tokens = generic_util::tokenize(ip_addr.c_str(), '.');
-
-                        for (auto& token : tokens)
-                        {
-                            unsigned short byte = static_cast<unsigned short>(std::stoi(token));
-                            ip += byte;
-                            ip <<= 8;
-                        }
-                    }
-
-                    if (generic_util::find_str_no_case(param.first, "port"))
-                        port = static_cast<unsigned short>(std::stoi(param.second));
-                }
-
-                return *this;
-            }
-        };
-
-        static Address no_address;
         static const size_t infinite_wait = 4294967295;
 
         virtual size_t read(void* buf, size_t buf_size, Address& user_data = no_address, size_t timeout = infinite_wait) = 0;
@@ -119,6 +112,14 @@ class SPROT_API Extended_Transport_Interface
         virtual ~Extended_Transport_Interface() {}
 
         static bool null_data(const Address& user_data) { return (&user_data == &no_address); }
+};
+
+class SPROT_API Protocol_Interface: public Basic_Transport_Interface
+{
+    public:
+
+        virtual bool connect(const Params& local_config, Address remote, size_t timeout = infinite_wait) = 0;
+        virtual bool accept(const Params& local_config, Address remote, size_t timeout = infinite_wait) = 0;
 };
 
 class SPROT_API Session: public Basic_Transport_Interface
@@ -132,9 +133,8 @@ class SPROT_API Session: public Basic_Transport_Interface
 class SPROT_API Session_Manager
 {
     public:
-
-        virtual Session* connect(const Protocol_Interface::Params& local_config, const Protocol_Interface::Params& remote, size_t timeout = Session::infinite_wait) = 0;
-        virtual Session* accept(const Protocol_Interface::Params& local_config, const Protocol_Interface::Params& remote, size_t timeout = Session::infinite_wait) = 0;
+        virtual Session* connect(const Params& local_config, const Params& remote, size_t timeout = Session::infinite_wait) = 0;
+        virtual Session* accept(const Params& local_config, const Params& remote, size_t timeout = Session::infinite_wait) = 0;
 
         virtual ~Session_Manager();
 };
@@ -150,6 +150,32 @@ namespace exceptions
             {
                 char str[40];
                 sprintf(str, "Unknown frame type %d detected.", frame_type);
+                message_ = str;
+            }
+    };
+
+    class Size_Mismatch : public fplog::exceptions::Generic_Exception
+    {
+        public:
+
+            Size_Mismatch(const char* facility, const char* file, int line, size_t expected, size_t actual):
+                Generic_Exception(facility, file, line)
+            {
+                char str[255];
+                sprintf(str, "Sent or received bytes mismatch: expected %lu, got %lu.", expected, actual);
+                message_ = str;
+            }
+    };
+
+    class Crc_Check_Failed : public fplog::exceptions::Generic_Exception
+    {
+        public:
+
+            Crc_Check_Failed(const char* facility, const char* file, int line, int expected, int actual):
+                Generic_Exception(facility, file, line)
+            {
+                char str[255];
+                sprintf(str, "CRC check failed: expected crc = %d, got crc = %d.", expected, actual);
                 message_ = str;
             }
     };
@@ -186,13 +212,18 @@ namespace implementation
     const unsigned int Max_Frame_Size = 255;
     const unsigned int Mtu = Max_Frame_Size - sizeof(Frame::bytes);
 
-    inline bool crc_check(void* buffer, size_t sz)
+    inline bool crc_check(void* buffer, size_t sz, unsigned short* expected = nullptr, unsigned short* actual = nullptr)
     {
         if (sz < sizeof(Frame::bytes))
             return false;
 
         unsigned short crc_expected = generic_util::gen_crc16(static_cast<unsigned char*>(buffer) + 2, static_cast<unsigned short>(sz) - 2);
         unsigned short* crc_actual = static_cast<unsigned short*>(buffer);
+
+        if (expected)
+            *expected = crc_expected;
+        if (actual)
+            *actual = *crc_actual;
 
         if (*crc_actual != crc_expected)
             return false;
