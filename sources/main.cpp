@@ -17,7 +17,7 @@
 void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
 {
     std::uniform_int_distribution<unsigned char> range(0, 255);
-    for (int i = 0; i < len; ++i)
+    for (size_t i = 0; i < len; ++i)
         buf[i] = range(*rng);
 }
 
@@ -48,7 +48,7 @@ TEST(Udp_Transport_Test, Smoke_Test)
     memset(send_buf, 0, sizeof(send_buf));
     memset(recv_buf, 0, sizeof(recv_buf));
 
-    char* message = "hello world?";
+    const char* message = "hello world?";
     memcpy(send_buf, message, strlen(message));
 
     sprot::Extended_Transport_Interface::Address recepient, origin;
@@ -89,10 +89,10 @@ TEST(L1_Transport_Test, Smoke_Test)
     memset(send_buf, 0, sizeof(send_buf));
     memset(recv_buf, 0, sizeof(recv_buf));
 
-    char* message = "hello world?";
+    const char* message = "hello world?";
 
     sprot::implementation::Frame frame;
-    frame.details.data_len = strlen(message);
+    frame.details.data_len = static_cast<unsigned short>(strlen(message));
     sprintf(frame.details.hostname, "WORKSTATION-666");
     frame.details.type = 0;
     frame.details.sequence = 999;
@@ -103,7 +103,7 @@ TEST(L1_Transport_Test, Smoke_Test)
     memcpy(send_buf + sizeof(frame.bytes), message, strlen(message));
 
     unsigned short crc = generic_util::gen_crc16(send_buf + 2, static_cast<unsigned short>(sizeof(frame.bytes) + strlen(message)) - 2);
-    unsigned short *pcrc = (unsigned short*)&send_buf[0];
+    unsigned short *pcrc = reinterpret_cast<unsigned short*>(&send_buf[0]);
     *pcrc = crc;
 
     sprot::Extended_Transport_Interface::Address recepient, origin, unknown_origin;
@@ -185,7 +185,7 @@ unsigned short fill_buffer_with_frame_and_random_data(unsigned char* buf, unsign
     randomize_buffer(buf + sizeof(frame.bytes), data_len, rng);
 
     unsigned short crc = generic_util::gen_crc16(buf + 2, static_cast<unsigned short>(sizeof(frame.bytes) + data_len) - 2);
-    unsigned short *pcrc = (unsigned short*)buf;
+    unsigned short *pcrc = reinterpret_cast<unsigned short*>(buf);
     *pcrc = crc;
 
     return (data_len + sizeof(frame.bytes));
