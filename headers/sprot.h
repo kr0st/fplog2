@@ -154,6 +154,19 @@ namespace exceptions
             }
     };
 
+    class Unexpected_Frame : public fplog::exceptions::Generic_Exception
+    {
+        public:
+
+            Unexpected_Frame(const char* facility, const char* file, int line, int expected, int actual):
+                Generic_Exception(facility, file, line)
+            {
+                char str[255];
+                sprintf(str, "Unexpected frame type %d detected when %d was expected.", actual, expected);
+                message_ = str;
+            }
+    };
+
     class Size_Mismatch : public fplog::exceptions::Generic_Exception
     {
         public:
@@ -176,6 +189,19 @@ namespace exceptions
             {
                 char str[255];
                 sprintf(str, "CRC check failed: expected crc = %d, got crc = %d.", expected, actual);
+                message_ = str;
+            }
+    };
+
+    class Wrong_Number : public fplog::exceptions::Generic_Exception
+    {
+        public:
+
+            Wrong_Number(const char* facility, const char* file, int line, unsigned int expected, unsigned int actual):
+                Generic_Exception(facility, file, line)
+            {
+                char str[255];
+                sprintf(str, "Sequence number check failed: expected %d, got %d.", expected, actual);
                 message_ = str;
             }
     };

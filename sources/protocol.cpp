@@ -43,14 +43,15 @@ class Protocol: Protocol_Interface
         void send_frame(size_t timeout);
         void receive_frame(size_t timeout);
 
-        Frame_Type frame_type(void* buffer);
         void make_frame(Frame_Type type, size_t data_len = 0, void* data = nullptr);
 
         void send_handshake(size_t timeout);
-        void receive_handshake(size_t timeout);
+        void receive_handshake(size_t timeout, bool parital = false);
 
         void send_goodbye(size_t timeout);
-        void receive_goodbye(size_t timeout);
+
+        void send_data(const void* buf, size_t buf_size, size_t timeout);
+        void receive_data_ack_or_goodbye(size_t timeout);
 
         void send_ack(size_t timeout);
         void receive_ack(size_t timeout);
@@ -88,6 +89,14 @@ void Protocol::receive_frame(size_t timeout)
     unsigned short crc_expected, crc_actual;
     if (!crc_check(read_buffer_, expected_bytes, &crc_expected, &crc_actual))
         THROW2(exceptions::Crc_Check_Failed, crc_expected, crc_actual);
+
+    if (frame.details.type != Frame_Type::Handshake_Frame)
+    {
+        if (frame.details.sequence != sequence_)
+            THROW2(exceptions::Wrong_Number, sequence_, frame.details.sequence);
+    }
+    else
+        sequence_ = frame.details.sequence;
 }
 
 Frame_Type frame_type(void* buffer)
@@ -130,26 +139,60 @@ void Protocol::make_frame(Frame_Type type, size_t data_len, void* data)
 
 void Protocol::send_handshake(size_t timeout)
 {
+    auto timer_start(sprot::implementation::check_time_out(timeout));
+
+    make_frame(Frame_Type::Handshake_Frame);
+    send_frame(op_timeout_);
+    sprot::implementation::check_time_out(timeout, timer_start);
+    receive_ack(op_timeout_);
+    sprot::implementation::check_time_out(timeout, timer_start);
+    send_ack(op_timeout_);
 }
 
-void Protocol::receive_handshake(size_t timeout)
+void Protocol::receive_handshake(size_t timeout, bool parital)
 {
+    auto timer_start(sprot::implementation::check_time_out(timeout));
+
+    if (!parital)
+    {
+        receive_frame(op_timeout_);
+        sprot::implementation::check_time_out(timeout, timer_start);
+    }
+
+    Frame_Type read(frame_type(read_buffer_));
+    if (read != Frame_Type::Handshake_Frame)
+        THROW2(exceptions::Unexpected_Frame, Frame_Type::Handshake_Frame, read);
+
+    send_ack(op_timeout_);
+    sprot::implementation::check_time_out(timeout, timer_start);
+    receive_ack(op_timeout_);
 }
 
 void Protocol::send_goodbye(size_t timeout)
 {
 }
 
-void Protocol::receive_goodbye(size_t timeout)
+void Protocol::send_data(const void* buf, size_t buf_size, size_t timeout)
+{
+}
+
+void Protocol::receive_data_ack_or_goodbye(size_t timeout)
 {
 }
 
 void Protocol::send_ack(size_t timeout)
 {
+    make_frame(Frame_Type::Ack_Frame);
+    send_frame(timeout);
 }
 
 void Protocol::receive_ack(size_t timeout)
 {
+    receive_frame(timeout);
+
+    Frame_Type read(frame_type(read_buffer_));
+    if (read != Frame_Type::Ack_Frame)
+        THROW2(exceptions::Unexpected_Frame, Frame_Type::Ack_Frame, read);
 }
 
 bool Protocol::connect(const Params& local_config, Address remote, size_t timeout)
