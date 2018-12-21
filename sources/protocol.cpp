@@ -1,5 +1,6 @@
 #include <mutex>
 #include <sprot.h>
+#include <stdint.h>
 
 namespace sprot { namespace implementation {
 
@@ -31,6 +32,8 @@ class Protocol: Protocol_Interface
         unsigned int sequence_;
         unsigned int op_timeout_;
 
+        unsigned int no_ack_count_ = 5;
+
         std::recursive_mutex mutex_;
 
         Extended_Transport_Interface* l1_transport_;
@@ -38,24 +41,32 @@ class Protocol: Protocol_Interface
         unsigned char read_buffer_[Max_Frame_Size];
         unsigned char write_buffer_[Max_Frame_Size];
 
+        struct Packed_Buffer { unsigned char buffer[Max_Frame_Size]; };
+        std::map<unsigned int, Packed_Buffer> stored_writes_;
+
         char localhost_[18];
 
         void send_frame(size_t timeout);
         void receive_frame(size_t timeout);
 
-        void make_frame(Frame_Type type, size_t data_len = 0, void* data = nullptr);
+        Frame make_frame(Frame_Type type, size_t data_len = 0, const void* data = nullptr);
 
-        void send_handshake(size_t timeout);
-        void receive_handshake(size_t timeout, bool parital = false);
+        void send_handshake_or_goodbye(size_t timeout, bool is_handshake = true);
+        void receive_handshake_or_goodbye(size_t timeout, bool is_handshake = true, bool parital = false);
 
         void send_goodbye(size_t timeout);
 
-        void send_data(const void* buf, size_t buf_size, size_t timeout);
-        void receive_data_ack_or_goodbye(size_t timeout);
+        void send_data_queue(unsigned int starting_sequence, size_t timeout);
+
+        void receive_anything(size_t timeout);
 
         void send_ack(size_t timeout);
         void receive_ack(size_t timeout);
 };
+
+void Protocol::send_goodbye(size_t timeout)
+{
+}
 
 void Protocol::send_frame(size_t timeout)
 {
@@ -94,25 +105,32 @@ void Protocol::receive_frame(size_t timeout)
     {
         if (frame.details.sequence != sequence_)
             THROW2(exceptions::Wrong_Number, sequence_, frame.details.sequence);
+
+        if (sequence_ == UINT32_MAX)
+            sequence_ = 0;
+        else
+            sequence_++;
     }
     else
         sequence_ = frame.details.sequence;
 }
 
+Frame frame_from_buffer(void* buffer)
+{
+    Frame frame;
+    memcpy(frame.bytes, buffer, sizeof(frame.bytes));
+    return frame;
+}
+
 Frame_Type frame_type(void* buffer)
 {
     if (buffer)
-    {
-        Frame frame;
-        memcpy(frame.bytes, buffer, sizeof(frame.bytes));
-        if (frame.details.type < Frame_Type::Unknown_Frame)
-            return Frame_Type(frame.details.type);
-    }
+        return Frame_Type(frame_from_buffer(buffer).details.type);
 
     return Frame_Type::Unknown_Frame;
 }
 
-void Protocol::make_frame(Frame_Type type, size_t data_len, void* data)
+Frame Protocol::make_frame(Frame_Type type, size_t data_len, const void* data)
 {
     if (type > Frame_Type::Unknown_Frame)
         THROW1(exceptions::Unknown_Frame, type);
@@ -121,7 +139,15 @@ void Protocol::make_frame(Frame_Type type, size_t data_len, void* data)
 
     frame.details.type = type;
     frame.details.data_len = static_cast<unsigned short>(data_len);
-    frame.details.sequence = sequence_++;
+
+    if (sequence_ == UINT32_MAX)
+    {
+        frame.details.sequence = sequence_;
+        sequence_ = 0;
+    }
+    else
+        frame.details.sequence = sequence_++;
+
     frame.details.origin_ip = local_.ip;
     frame.details.origin_listen_port = local_.port;
 
@@ -135,13 +161,19 @@ void Protocol::make_frame(Frame_Type type, size_t data_len, void* data)
     unsigned short crc = generic_util::gen_crc16(write_buffer_ + 2, static_cast<unsigned short>(sizeof(frame.bytes) + data_len) - 2);
     unsigned short *pcrc = reinterpret_cast<unsigned short*>(&write_buffer_[0]);
     *pcrc = crc;
+
+    return frame;
 }
 
-void Protocol::send_handshake(size_t timeout)
+void Protocol::send_handshake_or_goodbye(size_t timeout, bool is_handshake)
 {
     auto timer_start(sprot::implementation::check_time_out(timeout));
 
-    make_frame(Frame_Type::Handshake_Frame);
+    if (is_handshake)
+        make_frame(Frame_Type::Handshake_Frame);
+    else
+        make_frame(Frame_Type::Goodbye_Frame);
+
     send_frame(op_timeout_);
     sprot::implementation::check_time_out(timeout, timer_start);
     receive_ack(op_timeout_);
@@ -149,7 +181,7 @@ void Protocol::send_handshake(size_t timeout)
     send_ack(op_timeout_);
 }
 
-void Protocol::receive_handshake(size_t timeout, bool parital)
+void Protocol::receive_handshake_or_goodbye(size_t timeout, bool is_handshake, bool parital)
 {
     auto timer_start(sprot::implementation::check_time_out(timeout));
 
@@ -160,23 +192,24 @@ void Protocol::receive_handshake(size_t timeout, bool parital)
     }
 
     Frame_Type read(frame_type(read_buffer_));
-    if (read != Frame_Type::Handshake_Frame)
-        THROW2(exceptions::Unexpected_Frame, Frame_Type::Handshake_Frame, read);
+
+    if (is_handshake)
+    {
+        if (read != Frame_Type::Handshake_Frame)
+            THROW2(exceptions::Unexpected_Frame, Frame_Type::Handshake_Frame, read);
+    }
+    else
+    {
+        if (read != Frame_Type::Goodbye_Frame)
+            THROW2(exceptions::Unexpected_Frame, Frame_Type::Goodbye_Frame, read);
+    }
 
     send_ack(op_timeout_);
     sprot::implementation::check_time_out(timeout, timer_start);
     receive_ack(op_timeout_);
 }
 
-void Protocol::send_goodbye(size_t timeout)
-{
-}
-
-void Protocol::send_data(const void* buf, size_t buf_size, size_t timeout)
-{
-}
-
-void Protocol::receive_data_ack_or_goodbye(size_t timeout)
+void Protocol::receive_anything(size_t timeout)
 {
 }
 
@@ -209,7 +242,6 @@ bool Protocol::connect(const Params& local_config, Address remote, size_t timeou
 
     for (auto& param : local_config)
     {
-
         if (generic_util::find_str_no_case(param.first, "hostname"))
         {
             std::string host(param.second);
@@ -221,11 +253,86 @@ bool Protocol::connect(const Params& local_config, Address remote, size_t timeou
 
     connected_ = false;
 
-    receive_handshake(timeout);
+    receive_handshake_or_goodbye(timeout);
 
     connected_ = true;
 
     return connected_;
+}
+
+void Protocol::send_data_queue(unsigned int starting_sequence, size_t timeout)
+{
+    if (!l1_transport_)
+        THROW(fplog::exceptions::Transport_Missing);
+
+    if (stored_writes_.size() == 0)
+        return;
+
+    size_t per_write_to = timeout / stored_writes_.size();
+
+    auto it(stored_writes_.find(starting_sequence));
+    for (; it != stored_writes_.end(); ++it)
+    {
+        Frame frame;
+        memcpy(frame.bytes, it->second.buffer, sizeof(frame.bytes));
+
+        size_t written = l1_transport_->write(it->second.buffer, sizeof(frame.bytes) + frame.details.data_len, remote_, per_write_to);
+        if (written != (sizeof(frame.bytes) + frame.details.data_len))
+            THROW2(exceptions::Size_Mismatch, (sizeof(frame.bytes) + frame.details.data_len), written);
+
+        frame.details.sequence++;
+
+        if (frame.details.sequence % no_ack_count_ == 0)
+        {
+            send_ack(op_timeout_);
+            receive_ack(op_timeout_);
+        }
+    }
+}
+
+size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
+{
+    std::lock_guard lock(mutex_);
+
+    if (buf_size < sizeof(Frame::bytes))
+        THROW2(exceptions::Size_Mismatch, sizeof(Frame::bytes), buf_size);
+
+    if (sequence_ % no_ack_count_ == 0)
+    {
+        send_ack(op_timeout_);
+        bool doing_retransmit(false);
+
+        try
+        {
+            receive_ack(op_timeout_);
+        }
+        catch (exceptions::Unexpected_Frame& e)
+        {
+            Frame frame(frame_from_buffer(read_buffer_));
+
+            if (frame.details.type != Frame_Type::Retransmit_Frame)
+                throw e;
+
+            doing_retransmit = true;
+            sequence_ = frame.details.sequence;
+        }
+
+        if (doing_retransmit)
+        {
+            send_data_queue(sequence_, timeout);
+        }
+    }
+
+    Frame frame(make_frame(Frame_Type::Data_Frame, buf_size, buf));
+
+    Packed_Buffer packet;
+    memcpy(packet.buffer, write_buffer_, Max_Frame_Size);
+
+    stored_writes_[frame.details.sequence] = packet;
+
+    send_data_queue(frame.details.sequence, timeout);
+
+    return buf_size;
 }
 
 

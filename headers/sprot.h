@@ -230,6 +230,7 @@ namespace implementation
         Handshake_Frame = 0x13,
         Goodbye_Frame,
         Ack_Frame,
+        Nack_Frame,
         Data_Frame,
         Retransmit_Frame,
         Unknown_Frame
