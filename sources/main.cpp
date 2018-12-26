@@ -12,7 +12,7 @@
 #include <thread>
 #include <random>
 #include <vector>
-#include <any>
+#include <protocol.h>
 
 void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
 {
@@ -306,7 +306,7 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
     return bytes_read;
 }
 
-TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -394,6 +394,65 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader1.txt", "writer1.txt"));
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
+}
+
+TEST(Protocol_Test, Smoke_Test)
+{
+    sprot::Udp_Transport t1, t2;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26260";
+    params.insert(p);
+
+    t1.enable(params);
+
+    params["port"] = "26261";
+
+    t2.enable(params);
+
+    sprot::Packet_Router r1(&t1);
+    sprot::Packet_Router r2(&t2);
+
+    sprot::implementation::Protocol p1(&r1);
+    sprot::implementation::Protocol p2(&r2);
+
+    std::thread reader([&]{
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26260;
+
+        EXPECT_NO_THROW(p2.accept(params, remote, 5000));
+
+        unsigned char buf[sprot::implementation::Max_Frame_Size];
+
+        EXPECT_NO_THROW(p2.read(buf, sizeof(buf), 5000));
+        EXPECT_EQ(strcmp("hello world", reinterpret_cast<char*>(buf)), 0);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+    {
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26261;
+
+        params["port"] = "26260";
+        EXPECT_NO_THROW(p1.connect(params, remote, 5000));
+
+        unsigned char buf[sprot::implementation::Max_Frame_Size];
+        sprintf(reinterpret_cast<char*>(buf), "hello world");
+
+        EXPECT_NO_THROW(p1.write(buf, strlen("hello world") + 1, 5000));
+    }
+
+    reader.join();
 }
 
 int main(int argc, char **argv)

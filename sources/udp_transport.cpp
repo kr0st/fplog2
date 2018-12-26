@@ -334,7 +334,7 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, Address& user_data
         return static_cast<size_t>(res);
     else
     {
-        #ifdef __linux__
+        #ifndef _WIN32
             int e = errno;
             std::string msg("Socket error: " + std::to_string(e));
             THROWM(fplog::exceptions::Write_Failed, msg.c_str())
