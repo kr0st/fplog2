@@ -219,11 +219,21 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
         while (bytes_written < bytes_to_write)
         {
             sprot::Address fake_ip_port(fake_origin);
-            fill_buffer_with_frame_and_random_data(send_buf, sprot::implementation::Max_Frame_Size - sizeof(sprot::implementation::Frame::bytes), fake_ip_port.port, fake_ip_port.ip, rng);
+
+            unsigned long how_much = 0;
+
+            if (!sprot::Extended_Transport_Interface::null_data(fake_origin))
+            {
+                fill_buffer_with_frame_and_random_data(send_buf, sprot::implementation::Max_Frame_Size - sizeof(sprot::implementation::Frame::bytes), fake_ip_port.port, fake_ip_port.ip, rng);
+                how_much = (sprot::implementation::Max_Frame_Size < (bytes_to_write - bytes_written)) ? sprot::implementation::Max_Frame_Size : (bytes_to_write - bytes_written);
+            }
+            else
+            {
+                randomize_buffer(send_buf, sprot::implementation::Mtu, rng);
+                how_much = (sprot::implementation::Mtu < (bytes_to_write - bytes_written)) ? sprot::implementation::Mtu : (bytes_to_write - bytes_written);
+            }
 
             unsigned long current_bytes = 0;
-            unsigned long how_much = (sprot::implementation::Max_Frame_Size < (bytes_to_write - bytes_written)) ? sprot::implementation::Max_Frame_Size :
-                                                                                                                  (bytes_to_write - bytes_written);
 
             recipient = fake_origin;
             recipient.port = real_recipient_listen_port;
@@ -306,7 +316,7 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
     return bytes_read;
 }
 
-TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -396,7 +406,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Protocol_Test, Smoke_Test)
+TEST(Protocol_Test, DISABLED_Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 

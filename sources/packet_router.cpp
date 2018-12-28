@@ -16,7 +16,7 @@ void Packet_Router::reader_thread(Packet_Router* p)
 
         try
         {
-            unsigned long read_bytes = p->l0_transport_->read(read_buffer, sizeof(read_buffer), read_ext_data, 500);
+            unsigned long read_bytes = p->l0_transport_->read(read_buffer, sizeof(read_buffer), read_ext_data, 2500);
 
             if (read_bytes < sizeof(implementation::Frame::bytes))
                 continue;

@@ -37,11 +37,11 @@ class Protocol: Protocol_Interface
 
     private:
 
-        bool connected_ = false, acceptor_;
+        bool connected_ = false, acceptor_ = false;
         Address local_, remote_;
 
-        unsigned int sequence_;
-        unsigned int fail_counter_;
+        unsigned int sequence_ = 0;
+        unsigned int fail_counter_ = 0;
 
         ///options
         const unsigned int no_ack_count_ = 5;
@@ -52,7 +52,7 @@ class Protocol: Protocol_Interface
 
         std::recursive_mutex mutex_;
 
-        Extended_Transport_Interface* l1_transport_;
+        Extended_Transport_Interface* l1_transport_ = nullptr;
 
         unsigned char read_buffer_[Max_Frame_Size];
         unsigned char write_buffer_[Max_Frame_Size];
