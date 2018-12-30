@@ -7,7 +7,7 @@
 
 namespace sprot { namespace implementation {
 
-class Protocol: Protocol_Interface
+class Protocol: public Protocol_Interface
 {
     public:
 

@@ -21,7 +21,7 @@ void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
         buf[i] = range(*rng);
 }
 
-TEST(Udp_Transport_Test, Smoke_Test)
+TEST(Udp_Transport_Test, DISABLED_Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -62,7 +62,7 @@ TEST(Udp_Transport_Test, Smoke_Test)
     EXPECT_EQ(memcmp(message, recv_buf, strlen(message)), 0);
 }
 
-TEST(L1_Transport_Test, Smoke_Test)
+TEST(L1_Transport_Test, DISABLED_Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -316,7 +316,7 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
     return bytes_read;
 }
 
-TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -406,7 +406,7 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Protocol_Test, DISABLED_Smoke_Test)
+TEST(Protocol_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -463,6 +463,66 @@ TEST(Protocol_Test, DISABLED_Smoke_Test)
     }
 
     reader.join();
+}
+
+TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
+{
+    sprot::Udp_Transport t1, t2;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26260";
+    params.insert(p);
+
+    t1.enable(params);
+
+    params["port"] = "26261";
+
+    t2.enable(params);
+
+    sprot::Packet_Router r1(&t1);
+    sprot::Packet_Router r2(&t2);
+
+    sprot::implementation::Protocol p1(&r1);
+    sprot::implementation::Protocol p2(&r2);
+
+    unsigned long read_bytes1 = 0;
+    unsigned long sent_bytes1 = 0;
+
+    std::thread reader1([&]{
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26260;
+
+        EXPECT_NO_THROW(p2.accept(params, remote, 5000));
+
+        read_bytes1 = read_from_transport(2621400, std::string("reader1.txt"), &p2);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+    std::thread writer1([&]{
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26261;
+
+        params["port"] = "26260";
+        EXPECT_NO_THROW(p1.connect(params, remote, 5000));
+
+        sent_bytes1 = write_to_transport(2621400, std::string("writer1.txt"), &g_rng1, &p1);
+    });
+
+    writer1.join();
+
+    reader1.join();
+
+    EXPECT_TRUE(generic_util::compare_files("reader1.txt", "writer1.txt"));
 }
 
 int main(int argc, char **argv)

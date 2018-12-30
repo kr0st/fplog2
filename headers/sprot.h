@@ -70,12 +70,17 @@ struct Address
 
                 auto tokens = generic_util::tokenize(ip_addr.c_str(), '.');
 
+                int c = 0;
                 for (auto& token : tokens)
                 {
                     unsigned short byte = static_cast<unsigned short>(std::stoi(token));
                     ip += byte;
-                    ip <<= 8;
+                    c++;
+                    if (c < 4)
+                        ip <<= 8;
                 }
+
+                ip = htonl(ip);
             }
 
             if (generic_util::find_str_no_case(param.first, "port"))
