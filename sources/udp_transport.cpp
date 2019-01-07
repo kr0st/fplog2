@@ -219,6 +219,33 @@ size_t Udp_Transport::read(void* buf, size_t buf_size, Address& user_data, size_
     if (!enabled_)
         THROW(fplog::exceptions::Read_Failed);
 
+    static unsigned short buffered_port = 0;
+    static unsigned int buffered_ip = 0;
+
+buffered_read:
+
+    if (bytes_in_buffer_ > 0)
+    {
+        int min_len = static_cast<int>(buf_size);
+        if (min_len > bytes_in_buffer_)
+            min_len = bytes_in_buffer_;
+
+        memcpy(buf, read_buffer_ + read_position_, static_cast<size_t>(min_len));
+
+        bytes_in_buffer_ -= min_len;
+        read_position_ += min_len;
+
+        user_data.ip = buffered_ip;
+        user_data.port = buffered_port;
+
+        return static_cast<size_t>(min_len);
+    }
+    else
+    {
+        bytes_in_buffer_ = 0;
+        read_position_ = 0;
+    }
+
     sockaddr_in remote_addr;
     int addr_len = sizeof(remote_addr);
 
@@ -246,10 +273,22 @@ size_t Udp_Transport::read(void* buf, size_t buf_size, Address& user_data, size_
     if (res != 1)
         THROW(fplog::exceptions::Read_Failed);
 
+    bool buffered = true;
+
+    char* read_buf = read_buffer_;
+    int read_buf_size = read_buffer_size_;
+
+    if (buf_size >= static_cast<unsigned>(read_buffer_size_))
+    {
+        read_buf = reinterpret_cast<char*>(buf);
+        read_buf_size = static_cast<int>(buf_size);
+        buffered = false;
+    }
+
 #ifdef __APPLE__
-    res = recvfrom((int)socket_, buf, buf_size, 0, (sockaddr*)&remote_addr, (socklen_t *)&addr_len);
+    res = recvfrom((int)socket_, read_buf, read_buf_size, 0, (sockaddr*)&remote_addr, (socklen_t *)&addr_len);
 #else
-    res = recvfrom(socket_, (char*)buf, static_cast<int>(buf_size), 0, (sockaddr*)&remote_addr, (socklen_t *)&addr_len);
+    res = recvfrom(socket_, read_buf, read_buf_size, 0, (sockaddr*)&remote_addr, (socklen_t *)&addr_len);
 #endif
 
     if (res != SOCKET_ERROR)
@@ -258,6 +297,15 @@ size_t Udp_Transport::read(void* buf, size_t buf_size, Address& user_data, size_
         {
             user_data.ip = remote_addr.sin_addr.s_addr;
             user_data.port = ntohs(remote_addr.sin_port);
+
+            buffered_port = user_data.port;
+            buffered_ip = user_data.ip;
+        }
+
+        if (buffered)
+        {
+            bytes_in_buffer_ = res;
+            goto buffered_read;
         }
 
         return static_cast<size_t>(res);
@@ -347,6 +395,8 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, Address& user_data
 Udp_Transport::Udp_Transport():
 enabled_(false)
 {
+    bytes_in_buffer_ = 0;
+    read_buffer_ = new char[read_buffer_size_];
 }
 
 Udp_Transport::~Udp_Transport()
@@ -355,6 +405,10 @@ Udp_Transport::~Udp_Transport()
     std::lock_guard<std::recursive_mutex> write_lock(write_mutex_);
 
     disable();
+
+    bytes_in_buffer_ = 0;
+    delete [] read_buffer_;
+    read_buffer_ = nullptr;
 }
 
 };

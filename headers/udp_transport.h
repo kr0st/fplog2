@@ -60,6 +60,11 @@ class Udp_Transport: public sprot::Extended_Transport_Interface
         unsigned short port_;
 
         bool localhost_;
+
+        char* read_buffer_;
+        const int read_buffer_size_ = 1024 * 256;
+        int bytes_in_buffer_;
+        int read_position_ = 0;
 };
 
 };

@@ -16,16 +16,21 @@ void Packet_Router::reader_thread(Packet_Router* p)
 
         try
         {
-            unsigned long read_bytes = p->l0_transport_->read(read_buffer, sizeof(read_buffer), read_ext_data, 2500);
+            unsigned long read_bytes = p->l0_transport_->read(read_buffer, sizeof(implementation::Frame::bytes), read_ext_data, 250);
 
             if (read_bytes < sizeof(implementation::Frame::bytes))
                 continue;
 
-            if (!implementation::crc_check(read_buffer, read_bytes))
-                continue;
-
             implementation::Frame frame;
             memcpy(frame.bytes, read_buffer, sizeof(implementation::Frame::bytes));
+
+            if ((frame.details.type == implementation::Frame_Type::Data_Frame) && (frame.details.data_len > 0) && (frame.details.data_len <= implementation::Mtu))
+            {
+                read_bytes += p->l0_transport_->read(&(read_buffer[sizeof(implementation::Frame::bytes)]), frame.details.data_len, read_ext_data, 250);
+            }
+
+            if (!implementation::crc_check(read_buffer, read_bytes))
+                continue;
 
             read_ext_data.port = frame.details.origin_listen_port;
 

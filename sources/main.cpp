@@ -21,7 +21,7 @@ void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
         buf[i] = range(*rng);
 }
 
-TEST(Udp_Transport_Test, DISABLED_Smoke_Test)
+TEST(Udp_Transport_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -62,7 +62,7 @@ TEST(Udp_Transport_Test, DISABLED_Smoke_Test)
     EXPECT_EQ(memcmp(message, recv_buf, strlen(message)), 0);
 }
 
-TEST(L1_Transport_Test, DISABLED_Smoke_Test)
+TEST(L1_Transport_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -94,7 +94,7 @@ TEST(L1_Transport_Test, DISABLED_Smoke_Test)
     sprot::implementation::Frame frame;
     frame.details.data_len = static_cast<unsigned short>(strlen(message));
     sprintf(frame.details.hostname, "WORKSTATION-666");
-    frame.details.type = 0;
+    frame.details.type = sprot::implementation::Frame_Type::Data_Frame;
     frame.details.sequence = 999;
     frame.details.origin_ip = 0x0100007f;
     frame.details.origin_listen_port = 26261;
@@ -170,7 +170,7 @@ sprot::implementation::Frame make_dummy_frame(unsigned short origin_listen_port,
     frame.details.crc = 666;
     frame.details.data_len = data_len;
     sprintf(frame.details.hostname, "WORKSTATION-666");
-    frame.details.type = 0;
+    frame.details.type = sprot::implementation::Frame_Type::Data_Frame;
     frame.details.sequence = 999;
     frame.details.origin_ip = origin_ip;
     frame.details.origin_listen_port = origin_listen_port;
@@ -316,7 +316,7 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
     return bytes_read;
 }
 
-TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -406,7 +406,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Protocol_Test, Smoke_Test)
+TEST(Protocol_Test, DISABLED_Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -465,7 +465,7 @@ TEST(Protocol_Test, Smoke_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1)
 {
     sprot::Udp_Transport t1, t2;
 
