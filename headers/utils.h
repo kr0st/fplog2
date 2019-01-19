@@ -36,6 +36,25 @@ inline void hash_combine(std::size_t& seed, T const& v)
 namespace generic_util
 {
 
+struct Retryable
+{
+    using Retry_Function = std::function<bool()>;
+    unsigned int max_retries = 0;
+    unsigned int actual_retries = 0;
+
+    Retryable(Retry_Function func, unsigned int retries_allowed): max_retries(retries_allowed), retryable_function { std::move(func) } {}
+    bool run()
+    {
+        for (; actual_retries < max_retries; actual_retries++)
+            if (retryable_function())
+                break;
+
+        return (actual_retries < max_retries);
+    }
+
+    Retry_Function retryable_function;
+};
+
 uint16_t gen_crc16(const uint8_t *data, uint16_t size);
 
 template<typename InputIterator1, typename InputIterator2>

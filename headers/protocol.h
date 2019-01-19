@@ -22,15 +22,6 @@ class Protocol: public Protocol_Interface
         virtual ~Protocol()
         {
             std::lock_guard lock(mutex_);
-
-            try
-            {
-                send_handshake_or_goodbye(op_timeout_, false);
-            }
-            catch(...)
-            {
-            }
-
             connected_ = false;
         }
 
@@ -40,14 +31,15 @@ class Protocol: public Protocol_Interface
         bool connected_ = false, acceptor_ = false;
         Address local_, remote_;
 
-        unsigned int sequence_ = 0;
-        unsigned int fail_counter_ = 0;
+        unsigned int send_sequence_ = 0;
+        unsigned int recv_sequence_ = 0;
 
         ///options
         const unsigned int no_ack_count_ = 5;
         const unsigned int storage_max_ = 100;
         const unsigned int storage_trim_ = 50;
-        const unsigned int op_timeout_ = 500;
+        const unsigned int op_timeout_ = 200;
+        const unsigned int max_retries_ = 5;
         ///options
 
         std::recursive_mutex mutex_;
@@ -64,20 +56,10 @@ class Protocol: public Protocol_Interface
 
         void trim_storage();
 
-        void send_frame(size_t timeout);
-        void receive_frame(size_t timeout);
-
         Frame make_frame(Frame_Type type, size_t data_len = 0, const void* data = nullptr);
 
-        void send_handshake_or_goodbye(size_t timeout, bool is_handshake = true);
-        void receive_handshake_or_goodbye(size_t timeout, bool is_handshake = true, bool parital = false);
-
-        void send_data_queue(unsigned int starting_sequence, size_t timeout);
-
-        void receive_anything(size_t timeout);
-
-        void send_ack(size_t timeout);
-        void receive_ack(size_t timeout);
+        void send_frame(size_t timeout);
+        Frame receive_frame(size_t timeout);
 };
 
 }}
