@@ -3,19 +3,42 @@
 
 namespace sprot { namespace implementation {
 
-void Protocol::trim_storage()
+void Protocol::trim_storage(std::map<unsigned int, Packed_Buffer>& storage)
 {
-    if (stored_writes_.size() >= storage_max_)
+    if (storage.size() >= storage_max_)
     {
-        if (storage_trim_ >= stored_writes_.size())
-            stored_writes_.clear();
+        if (storage_trim_ >= storage.size())
+            storage.clear();
 
-        auto start = stored_writes_.begin();
+        auto start = storage.begin();
         auto finish = start;
         for (unsigned int i = 0; i < storage_trim_; i++, finish++);
 
-        stored_writes_.erase(start, finish);
+        storage.erase(start, finish);
     }
+}
+
+void Protocol::empty_storage(std::map<unsigned int, Packed_Buffer>& storage)
+{
+    std::map<unsigned int, Packed_Buffer> empty;
+    storage.clear();
+    storage.swap(empty);
+}
+
+void Protocol::put_in_storage(std::map<unsigned int, Packed_Buffer>& storage, unsigned int sequence, const void* buf)
+{
+    Packed_Buffer packed;
+    memset(packed.buffer, 0, Max_Frame_Size);
+    memcpy(packed.buffer, buf, Max_Frame_Size);
+    storage[sequence] = packed;
+}
+
+void Protocol::take_from_storage(std::map<unsigned int, Packed_Buffer>& storage, unsigned int sequence, void* buf)
+{
+    memset(buf, 0, Max_Frame_Size);
+    auto frame = storage.find(sequence);
+    if (frame != storage.end())
+        memcpy(buf, frame->second.buffer, Max_Frame_Size);
 }
 
 Frame frame_from_buffer(void* buffer)
@@ -151,11 +174,8 @@ bool Protocol::connect(const Params& local_config, Address remote, size_t timeou
             if (frame.details.type != Frame_Type::Ack_Frame)
                 return false;
 
-            {
-                std::map<unsigned int, Packed_Buffer> empty;
-                stored_writes_.clear();
-                stored_writes_.swap(empty);
-            }
+            empty_storage(stored_writes_);
+            empty_storage(stored_reads_);
 
             return true;
         }
@@ -185,7 +205,69 @@ bool Protocol::connect(const Params& local_config, Address remote, size_t timeou
 
 bool Protocol::accept(const Params& local_config, Address remote, size_t timeout)
 {
-    return false;
+    std::lock_guard lock(mutex_);
+
+    local_.from_params(local_config);
+    remote_ = remote;
+
+    memset(localhost_, 0, sizeof(localhost_));
+
+    for (auto& param : local_config)
+    {
+        if (generic_util::find_str_no_case(param.first, "hostname"))
+        {
+            std::string host(param.second);
+            host = generic_util::trim(host);
+            size_t max_copy = host.length() > sizeof(localhost_) ? sizeof(localhost_) : host.length();
+            memcpy(localhost_, host.c_str(), max_copy);
+        }
+    }
+
+    fplog::exceptions::Generic_Exception last_known_exception;
+    bool exception_happened = false;
+
+    auto main_timeout_timer = check_time_out(timeout);
+
+    auto recv_handshake = [&]() -> bool
+    {
+        check_time_out(timeout, main_timeout_timer);
+
+        try
+        {
+            Frame frame(receive_frame(op_timeout_));
+            if (frame.details.type != Frame_Type::Handshake_Frame)
+                return false;
+
+            make_frame(Frame_Type::Ack_Frame);
+            send_frame(op_timeout_);
+
+            empty_storage(stored_writes_);
+            empty_storage(stored_reads_);
+
+            return true;
+        }
+        catch (fplog::exceptions::Timeout&)
+        {
+            //cheking t/o again because we might have op timeout
+            //but not t/o used as argument in connect
+            //in case we have t/o from argument, t/o exception will be thrown again
+            check_time_out(timeout, main_timeout_timer);
+            return false;
+        }
+        catch (fplog::exceptions::Generic_Exception& e)
+        {
+            exception_happened = true;
+            last_known_exception = e;
+            return false;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    };
+
+    generic_util::Retryable handshake(recv_handshake, max_retries_);
+    return handshake.run();
 }
 
 size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
@@ -195,7 +277,72 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
 
 size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
 {
-    return 0;
+    if (!buf || (buf_size == 0))
+        return 0;
+
+    if (buf_size > sprot::implementation::Mtu)
+        THROW(fplog::exceptions::Buffer_Overflow);
+
+    std::lock_guard lock(mutex_);
+
+    fplog::exceptions::Generic_Exception last_known_exception;
+    bool exception_happened = false;
+
+    auto main_timeout_timer = check_time_out(timeout);
+
+    Frame data(make_frame(Frame_Type::Data_Frame, buf_size, buf));
+    put_in_storage(stored_writes_, data.details.sequence, write_buffer_);
+
+    auto send_data = [&]() -> bool
+    {
+        check_time_out(timeout, main_timeout_timer);
+
+        try
+        {
+            take_from_storage(stored_writes_, data.details.sequence, write_buffer_);
+            send_frame(op_timeout_);
+
+            if ((send_sequence_ % this->no_ack_count_) == 0)
+            {
+                Frame frame(receive_frame(op_timeout_));
+                if (frame.details.type != Frame_Type::Ack_Frame) //TODO: handle frame resending here
+                    return false;
+            }
+
+            return true;
+        }
+        catch (fplog::exceptions::Timeout&)
+        {
+            //cheking t/o again because we might have op timeout
+            //but not t/o used as argument in connect
+            //in case we have t/o from argument, t/o exception will be thrown again
+            check_time_out(timeout, main_timeout_timer);
+            return false;
+        }
+        catch (fplog::exceptions::Generic_Exception& e)
+        {
+            exception_happened = true;
+            last_known_exception = e;
+            return false;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    };
+
+    generic_util::Retryable transmission(send_data, max_retries_);
+    bool success(transmission.run());
+
+    if (success)
+        return buf_size;
+    else
+    {
+        if (exception_happened)
+            throw last_known_exception;
+        else
+            return 0;
+    }
 }
 
 }}

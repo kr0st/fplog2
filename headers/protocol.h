@@ -51,10 +51,14 @@ class Protocol: public Protocol_Interface
 
         struct Packed_Buffer { unsigned char buffer[Max_Frame_Size]; };
         std::map<unsigned int, Packed_Buffer> stored_writes_;
+        std::map<unsigned int, Packed_Buffer> stored_reads_;
 
         char localhost_[18];
 
-        void trim_storage();
+        void trim_storage(std::map<unsigned int, Packed_Buffer>& storage);
+        void empty_storage(std::map<unsigned int, Packed_Buffer>& storage);
+        void put_in_storage(std::map<unsigned int, Packed_Buffer>& storage, unsigned int sequence, const void* buf);
+        void take_from_storage(std::map<unsigned int, Packed_Buffer>& storage, unsigned int sequence, void* buf);
 
         Frame make_frame(Frame_Type type, size_t data_len = 0, const void* data = nullptr);
 
