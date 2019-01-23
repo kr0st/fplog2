@@ -465,7 +465,7 @@ TEST(Protocol_Test, Smoke_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1)
+TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
 {
     sprot::Udp_Transport t1, t2;
 

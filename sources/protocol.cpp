@@ -41,6 +41,16 @@ void Protocol::take_from_storage(std::map<unsigned int, Packed_Buffer>& storage,
         memcpy(buf, frame->second.buffer, Max_Frame_Size);
 }
 
+bool is_buffer_empty(const void* buffer)
+{
+    char empty[Max_Frame_Size];
+    memset(empty, 0, Max_Frame_Size);
+    if (memcmp(buffer, empty, Max_Frame_Size) == 0)
+        return true;
+    else
+        return false;
+}
+
 Frame frame_from_buffer(void* buffer)
 {
     Frame frame;
@@ -74,8 +84,11 @@ Frame Protocol::make_frame(Frame_Type type, size_t data_len, const void* data)
 
     if (send_sequence_ == UINT32_MAX)
     {
-        frame.details.sequence = send_sequence_;
-        send_sequence_ = 0;
+        if (frame.details.type == Frame_Type::Data_Frame)
+        {
+            frame.details.sequence = send_sequence_;
+            send_sequence_ = 0;
+        }
     }
     else
     {
@@ -96,6 +109,12 @@ Frame Protocol::make_frame(Frame_Type type, size_t data_len, const void* data)
     unsigned short crc = generic_util::gen_crc16(write_buffer_ + 2, static_cast<unsigned short>(sizeof(frame.bytes) + data_len) - 2);
     unsigned short *pcrc = reinterpret_cast<unsigned short*>(&write_buffer_[0]);
     *pcrc = crc;
+
+    if (frame.details.type == Frame_Type::Data_Frame)
+    {
+        trim_storage(stored_writes_);
+        put_in_storage(stored_writes_, frame.details.sequence, write_buffer_);
+    }
 
     return frame;
 }
@@ -132,6 +151,23 @@ Frame Protocol::receive_frame(size_t timeout)
     unsigned short crc_expected, crc_actual;
     if (!crc_check(read_buffer_, expected_bytes, &crc_expected, &crc_actual))
         THROW2(exceptions::Crc_Check_Failed, crc_expected, crc_actual);
+
+    if (frame.details.type == Frame_Type::Data_Frame)
+    {
+        trim_storage(stored_reads_);
+        put_in_storage(stored_reads_, frame.details.sequence, read_buffer_);
+
+        if (frame.details.sequence == recv_sequence_)
+        {
+            if (recv_sequence_ == UINT32_MAX)
+            {
+                frame.details.sequence = 0;
+                recv_sequence_ = 0;
+            }
+
+            recv_sequence_++;
+        }
+    }
 
     return frame;
 }
@@ -272,6 +308,101 @@ bool Protocol::accept(const Params& local_config, Address remote, size_t timeout
 
 size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
 {
+    if (!buf || (buf_size == 0))
+        return 0;
+
+    if (buf_size < sprot::implementation::Mtu)
+        THROW(fplog::exceptions::Buffer_Overflow);
+
+    std::lock_guard lock(mutex_);
+
+    if (!recovered_frames_.empty())
+    {
+        unsigned int sequence = recovered_frames_.front();
+        recovered_frames_.pop();
+
+        take_from_storage(stored_reads_, sequence, read_buffer_);
+        Frame frame(frame_from_buffer(read_buffer_));
+
+        memcpy(buf, read_buffer_ + sizeof(frame.bytes), frame.details.data_len);
+        return frame.details.data_len;
+    }
+
+    fplog::exceptions::Generic_Exception last_known_exception;
+    bool exception_happened = false;
+    Frame frame;
+
+    auto main_timeout_timer = check_time_out(timeout);
+
+    auto read_data = [&]() -> bool
+    {
+        check_time_out(timeout, main_timeout_timer);
+
+        try
+        {
+            frame = receive_frame(op_timeout_);
+            if (frame.details.type != Frame_Type::Data_Frame)
+                return false;
+
+            if ((frame.details.sequence + 1) == recv_sequence_)
+            {
+                //Correct sequence number, can return with success.
+                if ((frame.details.sequence % this->no_ack_count_) == 0)
+                {
+                    make_frame(Frame_Type::Ack_Frame);
+                    send_frame(op_timeout_);
+                }
+
+                memcpy(buf, read_buffer_ + sizeof(frame.bytes), frame.details.data_len);
+                return true;
+            }
+            else
+                THROW2(sprot::exceptions::Wrong_Number, recv_sequence_, (frame.details.sequence + 1));
+        }
+        catch (fplog::exceptions::Timeout&)
+        {
+            //cheking t/o again because we might have op timeout
+            //but not t/o used as argument in connect
+            //in case we have t/o from argument, t/o exception will be thrown again
+            check_time_out(timeout, main_timeout_timer);
+            return false;
+        }
+        catch (sprot::exceptions::Wrong_Number& e)
+        {
+            throw e;
+        }
+        catch (fplog::exceptions::Generic_Exception& e)
+        {
+            exception_happened = true;
+            last_known_exception = e;
+            return false;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    };
+
+    try
+    {
+        generic_util::Retryable transmission(read_data, max_retries_);
+        bool success(transmission.run());
+
+        if (success)
+            return frame.details.data_len;
+        else
+        {
+            if (exception_happened)
+                throw last_known_exception;
+            else
+                return 0;
+        }
+    }
+    catch (sprot::exceptions::Wrong_Number&)
+    {
+        //TODO: implement request resending frames here
+    }
+
     return 0;
 }
 
@@ -291,7 +422,6 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
     auto main_timeout_timer = check_time_out(timeout);
 
     Frame data(make_frame(Frame_Type::Data_Frame, buf_size, buf));
-    put_in_storage(stored_writes_, data.details.sequence, write_buffer_);
 
     auto send_data = [&]() -> bool
     {

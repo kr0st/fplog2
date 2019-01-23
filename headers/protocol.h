@@ -2,6 +2,8 @@
 #define PROTOCOL_H
 
 #include <mutex>
+#include <queue>
+
 #include <sprot.h>
 #include <stdint.h>
 
@@ -38,7 +40,7 @@ class Protocol: public Protocol_Interface
         const unsigned int no_ack_count_ = 5;
         const unsigned int storage_max_ = 100;
         const unsigned int storage_trim_ = 50;
-        const unsigned int op_timeout_ = 200;
+        const unsigned int op_timeout_ = 500;
         const unsigned int max_retries_ = 5;
         ///options
 
@@ -52,6 +54,7 @@ class Protocol: public Protocol_Interface
         struct Packed_Buffer { unsigned char buffer[Max_Frame_Size]; };
         std::map<unsigned int, Packed_Buffer> stored_writes_;
         std::map<unsigned int, Packed_Buffer> stored_reads_;
+        std::queue<unsigned int> recovered_frames_;
 
         char localhost_[18];
 
