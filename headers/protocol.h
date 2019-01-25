@@ -67,6 +67,10 @@ class Protocol: public Protocol_Interface
 
         void send_frame(size_t timeout);
         Frame receive_frame(size_t timeout);
+
+        bool retransmit_request(std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start,
+                                size_t timeout,
+                                unsigned int last_received_sequence);
 };
 
 }}

@@ -316,17 +316,30 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
 
     std::lock_guard lock(mutex_);
 
-    if (!recovered_frames_.empty())
+    auto process_recovered = [&]() -> unsigned int
     {
-        unsigned int sequence = recovered_frames_.front();
-        recovered_frames_.pop();
+        if (!recovered_frames_.empty())
+        {
+            unsigned int sequence = recovered_frames_.front();
+            recovered_frames_.pop();
 
-        take_from_storage(stored_reads_, sequence, read_buffer_);
-        Frame frame(frame_from_buffer(read_buffer_));
+            take_from_storage(stored_reads_, sequence, read_buffer_);
+            Frame frame(frame_from_buffer(read_buffer_));
 
-        memcpy(buf, read_buffer_ + sizeof(frame.bytes), frame.details.data_len);
-        return frame.details.data_len;
-    }
+            memcpy(buf, read_buffer_ + sizeof(frame.bytes), frame.details.data_len);
+
+            if (recovered_frames_.empty())
+                recv_sequence_ = frame.details.sequence + 1;
+
+            return frame.details.data_len;
+        }
+        else
+            return 0;
+    };
+
+    unsigned int recovered_len = process_recovered();
+    if (recovered_len > 0)
+        return recovered_len;
 
     fplog::exceptions::Generic_Exception last_known_exception;
     bool exception_happened = false;
@@ -400,10 +413,54 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
     }
     catch (sprot::exceptions::Wrong_Number&)
     {
-        //TODO: implement request resending frames here
+        if (retransmit_request(main_timeout_timer, timeout, frame.details.sequence))
+            return process_recovered();
     }
 
     return 0;
+}
+
+bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start,
+                                  size_t timeout,
+                                  unsigned int last_received_sequence)
+{
+
+    Frame frame;
+
+    auto read_data = [&]() -> bool
+    {
+        check_time_out(timeout, timer_start);
+
+        try
+        {
+            frame = receive_frame(op_timeout_);
+            if (frame.details.type != Frame_Type::Data_Frame)
+                return false;
+            else
+                last_received_sequence = frame.details.sequence;
+
+            if ((last_received_sequence % no_ack_count_) == 0)
+                return true;
+
+            return false;
+        }
+        catch (fplog::exceptions::Timeout&)
+        {
+            //cheking t/o again because we might have op timeout
+            //but not t/o used as argument in connect
+            //in case we have t/o from argument, t/o exception will be thrown again
+            check_time_out(timeout, timer_start);
+            return false;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    };
+
+    while ((last_received_sequence % no_ack_count_) != 0)
+        read_data();
+
 }
 
 size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
