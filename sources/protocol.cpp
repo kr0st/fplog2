@@ -160,12 +160,9 @@ Frame Protocol::receive_frame(size_t timeout)
         if (frame.details.sequence == recv_sequence_)
         {
             if (recv_sequence_ == UINT32_MAX)
-            {
-                frame.details.sequence = 0;
                 recv_sequence_ = 0;
-            }
-
-            recv_sequence_++;
+            else
+                recv_sequence_++;
         }
     }
 
@@ -329,7 +326,12 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
             memcpy(buf, read_buffer_ + sizeof(frame.bytes), frame.details.data_len);
 
             if (recovered_frames_.empty())
-                recv_sequence_ = frame.details.sequence + 1;
+            {
+                if (frame.details.sequence == UINT32_MAX)
+                    recv_sequence_ = 0;
+                else
+                    recv_sequence_ = frame.details.sequence + 1;
+            }
 
             return frame.details.data_len;
         }
@@ -357,7 +359,8 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
             if (frame.details.type != Frame_Type::Data_Frame)
                 return false;
 
-            if ((frame.details.sequence + 1) == recv_sequence_)
+            if (((frame.details.sequence + 1) == recv_sequence_) ||
+                ((frame.details.sequence == UINT32_MAX) && (recv_sequence_ == 0)))
             {
                 //Correct sequence number, can return with success.
                 if ((frame.details.sequence % this->no_ack_count_) == 0)
@@ -424,8 +427,9 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
                                   size_t timeout,
                                   unsigned int last_received_sequence)
 {
-
     Frame frame;
+    bool any_data = false;
+    unsigned int stored_seq = recv_sequence_;
 
     auto read_data = [&]() -> bool
     {
@@ -439,8 +443,13 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
             else
                 last_received_sequence = frame.details.sequence;
 
-            if ((last_received_sequence % no_ack_count_) == 0)
-                return true;
+            if (!any_data)
+            {
+                if ((last_received_sequence % no_ack_count_) == 0)
+                    return true;
+            }
+            else
+                return  true;
 
             return false;
         }
@@ -461,6 +470,110 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
     while ((last_received_sequence % no_ack_count_) != 0)
         read_data();
 
+    std::vector <unsigned int> missing;
+    for (unsigned int seq = recv_sequence_; seq == last_received_sequence; )
+    {
+        if (stored_reads_.find(seq) == stored_reads_.end())
+            missing.push_back(seq);
+
+        if (seq == UINT32_MAX)
+            seq = 0;
+        else
+            seq++;
+    }
+
+    bool send_ack = missing.empty();
+    unsigned rr_from = 0, rr_count = 0;
+
+    auto send_ack_or_retransmit = [&]() -> bool
+    {
+        check_time_out(timeout, timer_start);
+
+        try
+        {
+            if (send_ack)
+                make_frame(Frame_Type::Ack_Frame);
+            else
+                make_frame(Frame_Type::Retransmit_Frame, rr_count * sizeof(unsigned int), &(missing[rr_from]));
+
+            send_frame(op_timeout_);
+            return true;
+        }
+        catch (fplog::exceptions::Timeout&)
+        {
+            //cheking t/o again because we might have op timeout
+            //but not t/o used as argument in connect
+            //in case we have t/o from argument, t/o exception will be thrown again
+            check_time_out(timeout, timer_start);
+            return false;
+        }
+        catch (sprot::exceptions::Wrong_Number& e)
+        {
+            throw e;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    };
+
+    generic_util::Retryable ack_or_rr(send_ack_or_retransmit, max_retries_);
+
+    if (send_ack)
+        ack_or_rr.run();
+
+    rr_from = 0;
+    rr_count = static_cast<unsigned>(missing.size());
+
+    while (rr_from < missing.size())
+    {
+        if (!send_ack)
+        {
+            while (rr_count * sizeof(unsigned int) > Mtu)
+            {
+                if (rr_count == 0)
+                    break;
+                rr_count--;
+            }
+
+            ack_or_rr.run();
+        }
+
+        if (!missing.empty())
+        {
+            generic_util::Retryable receive_missing(read_data, max_retries_);
+            any_data = true;
+
+            for (unsigned i = 0; i < rr_count; ++i)
+                receive_missing.run();
+
+            rr_from += rr_count;
+            unsigned temp = rr_count;
+            rr_count = static_cast<unsigned>(missing.size()) - temp;
+        }
+    }
+
+    missing.clear();
+
+    {
+        std::queue<unsigned int> empty;
+        recovered_frames_.swap(empty);
+    }
+
+    for (unsigned int seq = stored_seq; seq == last_received_sequence; )
+    {
+        if (stored_reads_.find(seq) == stored_reads_.end())
+            missing.push_back(seq);
+        else
+            recovered_frames_.push(seq);
+
+        if (seq == UINT32_MAX)
+            seq = 0;
+        else
+            seq++;
+    }
+
+    return missing.empty();
 }
 
 size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
