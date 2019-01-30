@@ -417,10 +417,14 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
     catch (sprot::exceptions::Wrong_Number&)
     {
         if (retransmit_request(main_timeout_timer, timeout, frame.details.sequence))
-            return process_recovered();
-    }
+        {
+            size_t len = process_recovered();
+            if (len > 0)
+                return len;
+        }
 
-    return 0;
+        THROW(exceptions::Connection_Broken);
+    }
 }
 
 bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start,
@@ -551,6 +555,8 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
             unsigned temp = rr_count;
             rr_count = static_cast<unsigned>(missing.size()) - temp;
         }
+        else
+            break;
     }
 
     missing.clear();
@@ -571,6 +577,14 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
             seq = 0;
         else
             seq++;
+    }
+
+    if (missing.empty() && (!send_ack))
+    {
+        send_ack = true;
+        ack_or_rr.run();
+
+        return true;
     }
 
     return missing.empty();

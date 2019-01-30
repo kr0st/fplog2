@@ -210,6 +210,19 @@ namespace exceptions
                 message_ = str;
             }
     };
+
+    class Connection_Broken : public fplog::exceptions::Generic_Exception
+    {
+        public:
+
+            Connection_Broken(const char* facility, const char* file, int line):
+                Generic_Exception(facility, file, line)
+            {
+                char str[255];
+                sprintf(str, "Connection broke down, please redo accept/connect.");
+                message_ = str;
+            }
+    };
 };
 
 namespace implementation
