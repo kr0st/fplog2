@@ -606,6 +606,7 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
     auto main_timeout_timer = check_time_out(timeout);
 
     Frame data(make_frame(Frame_Type::Data_Frame, buf_size, buf));
+    Frame recv_frame;
 
     auto send_data = [&]() -> bool
     {
@@ -618,9 +619,9 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
 
             if ((send_sequence_ % this->no_ack_count_) == 0)
             {
-                Frame frame(receive_frame(op_timeout_));
-                if (frame.details.type != Frame_Type::Ack_Frame) //TODO: handle frame resending here
-                    return false;
+                recv_frame = receive_frame(op_timeout_);
+                if (recv_frame.details.type != Frame_Type::Ack_Frame) //TODO: handle frame resending here
+                    THROW2(exceptions::Unexpected_Frame, Frame_Type::Ack_Frame, recv_frame.details.type);
             }
 
             return true;
@@ -632,6 +633,10 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
             //in case we have t/o from argument, t/o exception will be thrown again
             check_time_out(timeout, main_timeout_timer);
             return false;
+        }
+        catch (exceptions::Unexpected_Frame& e)
+        {
+            throw e;
         }
         catch (fplog::exceptions::Generic_Exception& e)
         {
@@ -646,17 +651,71 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
     };
 
     generic_util::Retryable transmission(send_data, max_retries_);
-    bool success(transmission.run());
+    bool success = false;
 
-    if (success)
-        return buf_size;
-    else
+    try
     {
-        if (exception_happened)
-            throw last_known_exception;
+        success = transmission.run();
+
+        if (success)
+            return buf_size;
         else
-            return 0;
+        {
+            if (exception_happened)
+                throw last_known_exception;
+            else
+                return 0;
+        }
     }
+    catch (exceptions::Unexpected_Frame& e)
+    {
+        if (recv_frame.details.type != Frame_Type::Retransmit_Frame)
+        {
+            if (send_sequence_ == 0)
+                send_sequence_ = UINT32_MAX;
+            else
+                send_sequence_--;
+
+            throw e;
+        }
+        if (retransmit_response(main_timeout_timer, timeout))
+            return buf_size;
+        else
+        {
+            THROW(exceptions::Connection_Broken);
+        }
+    }
+    catch(fplog::exceptions::Timeout& e)
+    {
+        if (send_sequence_ == 0)
+            send_sequence_ = UINT32_MAX;
+        else
+            send_sequence_--;
+
+        throw e;
+    }
+    catch (...)
+    {
+        THROW(exceptions::Connection_Broken);
+    }
+}
+
+bool Protocol::retransmit_response(std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start, size_t timeout)
+{
+    Frame retransmit(frame_from_buffer(write_buffer_));
+
+    if (retransmit.details.data_len < sizeof(unsigned int))
+        return false;
+
+    unsigned int count = retransmit.details.data_len / sizeof(unsigned int);
+    if (count == 0)
+        return false;
+
+    std::vector<unsigned int> resend_frames;
+    resend_frames.resize(count);
+
+
+    return false;
 }
 
 }}
