@@ -138,6 +138,8 @@ Frame Protocol::receive_frame(size_t timeout)
     if (!l1_transport_)
         THROW(fplog::exceptions::Transport_Missing);
 
+recv_again:
+
     size_t received_bytes = l1_transport_->read(read_buffer_, Max_Frame_Size, remote_, timeout);
 
     Frame frame;
@@ -155,6 +157,10 @@ Frame Protocol::receive_frame(size_t timeout)
     if (frame.details.type == Frame_Type::Data_Frame)
     {
         trim_storage(stored_reads_);
+
+        if (stored_reads_.find(frame.details.sequence) != stored_reads_.end())
+            goto recv_again;
+
         put_in_storage(stored_reads_, frame.details.sequence, read_buffer_);
 
         if (frame.details.sequence == recv_sequence_)
@@ -620,7 +626,7 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
             if ((send_sequence_ % this->no_ack_count_) == 0)
             {
                 recv_frame = receive_frame(op_timeout_);
-                if (recv_frame.details.type != Frame_Type::Ack_Frame) //TODO: handle frame resending here
+                if (recv_frame.details.type != Frame_Type::Ack_Frame)
                     THROW2(exceptions::Unexpected_Frame, Frame_Type::Ack_Frame, recv_frame.details.type);
             }
 
@@ -702,6 +708,8 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
 
 bool Protocol::retransmit_response(std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start, size_t timeout)
 {
+retrans_again:
+
     Frame retransmit(frame_from_buffer(write_buffer_));
 
     if (retransmit.details.data_len < sizeof(unsigned int))
@@ -714,6 +722,42 @@ bool Protocol::retransmit_response(std::chrono::time_point<std::chrono::system_c
     std::vector<unsigned int> resend_frames;
     resend_frames.resize(count);
 
+    memcpy(&(resend_frames[0]), write_buffer_ + sizeof(Frame::bytes), retransmit.details.data_len);
+
+    auto send_data = [&]() -> bool
+    {
+        check_time_out(timeout, timer_start);
+
+        try
+        {
+
+            for (size_t i = 0; i < resend_frames.size(); ++i)
+            {
+                take_from_storage(stored_writes_, resend_frames[i], write_buffer_);
+                send_frame(op_timeout_);
+            }
+
+            Frame ack_rr(receive_frame(op_timeout_));
+
+            if (ack_rr.details.type == Frame_Type::Ack_Frame)
+                return true;
+
+            if (ack_rr.details.type == Frame_Type::Retransmit_Frame)
+                //TODO: do retrans again
+        }
+        catch (fplog::exceptions::Timeout&)
+        {
+            //cheking t/o again because we might have op timeout
+            //but not t/o used as argument in connect
+            //in case we have t/o from argument, t/o exception will be thrown again
+            check_time_out(timeout, timer_start);
+            return false;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    };
 
     return false;
 }
