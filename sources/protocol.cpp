@@ -724,6 +724,9 @@ retrans_again:
 
     memcpy(&(resend_frames[0]), write_buffer_ + sizeof(Frame::bytes), retransmit.details.data_len);
 
+    unsigned char empty_buffer_[Max_Frame_Size];
+    memset(empty_buffer_, 0, Max_Frame_Size);
+
     auto send_data = [&]() -> bool
     {
         check_time_out(timeout, timer_start);
@@ -734,6 +737,8 @@ retrans_again:
             for (size_t i = 0; i < resend_frames.size(); ++i)
             {
                 take_from_storage(stored_writes_, resend_frames[i], write_buffer_);
+                if (memcmp(write_buffer_, empty_buffer_, Max_Frame_Size) == 0)
+                    THROW(exceptions::Connection_Broken);
                 send_frame(op_timeout_);
             }
 
@@ -743,7 +748,9 @@ retrans_again:
                 return true;
 
             if (ack_rr.details.type == Frame_Type::Retransmit_Frame)
-                //TODO: do retrans again
+                THROW(fplog::exceptions::Generic_Exception);
+
+            return false;
         }
         catch (fplog::exceptions::Timeout&)
         {
@@ -753,13 +760,32 @@ retrans_again:
             check_time_out(timeout, timer_start);
             return false;
         }
+        catch (exceptions::Connection_Broken& e)
+        {
+            throw e;
+        }
+        catch (exceptions::Repeat_Retransmit& e)
+        {
+            throw e;
+        }
         catch (...)
         {
             return false;
         }
     };
 
-    return false;
+    generic_util::Retryable retransmit_data(send_data, max_retries_);
+
+    try
+    {
+        retransmit_data.run();
+    }
+    catch (exceptions::Repeat_Retransmit&)
+    {
+        goto retrans_again;
+    }
+
+    return true;
 }
 
 }}

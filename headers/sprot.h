@@ -223,6 +223,16 @@ namespace exceptions
                 message_ = str;
             }
     };
+
+    class Repeat_Retransmit : public fplog::exceptions::Generic_Exception
+    {
+        public:
+
+            Repeat_Retransmit(const char* facility, const char* file, int line):
+                Generic_Exception(facility, file, line)
+            {
+            }
+    };
 };
 
 namespace implementation

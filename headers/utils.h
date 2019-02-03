@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <vector>
 #include <fstream>
+#include <queue>
+#include <thread>
 
 template<typename T>
 struct std::hash<std::vector<T>>
@@ -32,6 +34,24 @@ inline void hash_combine(std::size_t& seed, T const& v)
     seed ^= std::hash<T>()(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 
+namespace debug_logging
+{
+    class Logger
+    {
+        public:
+
+            Logger();
+
+
+        private:
+
+            std::queue<std::string> messages_;
+            std::recursive_mutex mutex_;
+            std::thread writer_;
+    };
+
+    extern Logger g_logger;
+}
 
 namespace generic_util
 {
