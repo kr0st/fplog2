@@ -16,7 +16,7 @@
 
 void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
 {
-    std::uniform_int_distribution<unsigned char> range(0, 255);
+    std::uniform_int_distribution<unsigned char> range(97, 122); //ascii 'a' to 'z'
     for (size_t i = 0; i < len; ++i)
         buf[i] = range(*rng);
 }
@@ -527,6 +527,8 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
 
 int main(int argc, char **argv)
 {
+    debug_logging::g_logger.open("fplog2-test-log.txt");
+
     ::testing::InitGoogleTest(&argc, argv);
     int res = RUN_ALL_TESTS();
 

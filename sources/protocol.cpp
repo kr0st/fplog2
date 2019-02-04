@@ -3,6 +3,17 @@
 
 namespace sprot { namespace implementation {
 
+class Frame_Logger
+{
+    public:
+
+        void log(void* buf)
+        {
+        }
+};
+
+static Frame_Logger logger;
+
 void Protocol::trim_storage(std::map<unsigned int, Packed_Buffer>& storage)
 {
     if (storage.size() >= storage_max_)

@@ -155,6 +155,72 @@ void cause_of_death(size_t timeout)
     }
 }
 
+namespace debug_logging
+{
+
+    Logger::Logger():
+    writer_(std::bind(Logger::writer_thread, this))
+    {
+    }
+
+    Logger::~Logger()
+    {
+        shutdown_ = true;
+        writer_.join();
+    }
+
+    void Logger::log(const std::string& message)
+    {
+        std::lock_guard lock(mutex_);
+        messages_.push(message);
+    }
+
+    bool Logger::open(char* file)
+    {
+        if (!file)
+            return false;
+
+        std::lock_guard lock(mutex_);
+
+        if (log_)
+            fclose(log_);
+
+        log_ = fopen(file, "wt");
+
+        return (log_ != nullptr);
+    }
+
+    void Logger::writer_thread(Logger* l)
+    {
+        while (!l->shutdown_)
+        {
+            if (!l->log_)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+
+            std::queue<std::string> messages;
+
+            {
+                std::lock_guard lock(l->mutex_);
+                messages = l->messages_;
+            }
+
+            while (messages.size() > 0)
+            {
+                std::string message(messages.front());
+                fprintf(l->log_, "%s\n", message.c_str());
+                messages.pop();
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
+
+    Logger g_logger;
+};
+
 namespace generic_util
 {
 

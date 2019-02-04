@@ -41,6 +41,10 @@ namespace debug_logging
         public:
 
             Logger();
+            ~Logger();
+
+            bool open(char* file);
+            void log(const std::string& message);
 
 
         private:
@@ -48,6 +52,11 @@ namespace debug_logging
             std::queue<std::string> messages_;
             std::recursive_mutex mutex_;
             std::thread writer_;
+
+            static void writer_thread(Logger* l);
+            bool shutdown_ = false;
+
+            FILE* log_ = nullptr;
     };
 
     extern Logger g_logger;
