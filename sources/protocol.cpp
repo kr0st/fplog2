@@ -3,13 +3,69 @@
 
 namespace sprot { namespace implementation {
 
+Frame frame_from_buffer(void* buffer)
+{
+    Frame frame;
+    memcpy(frame.bytes, buffer, sizeof(frame.bytes));
+    return frame;
+}
+
 class Frame_Logger
 {
     public:
 
-        void log(void* buf)
+        Frame_Logger()
         {
+            unsigned i = 0x13;
+            frame_types_[i++] = "HS";
+            frame_types_[i++] = "GB";
+            frame_types_[i++] = "AK";
+            frame_types_[i++] = "NA";
+            frame_types_[i++] = "DT";
+            frame_types_[i++] = "RR";
         }
+
+        void log(void* buf, char* direction)
+        {
+            static long unsigned int ln = 0;
+
+            if (!buf || !direction)
+                return;
+
+            bool crc = crc_check(buf, Max_Frame_Size);
+
+            Frame frame(frame_from_buffer(buf));
+            char str[1024];
+            char host[21];
+            char data[255];
+
+            memset(data, 0, sizeof(data));
+            memcpy(data, static_cast<char*>(buf) + sizeof(frame.bytes), frame.details.data_len);
+
+            memset(host, 0, sizeof(host));
+            memcpy(host, frame.details.hostname, sizeof(frame.details.hostname));
+
+            std::string type;
+            auto it = frame_types_.find(frame.details.type);
+            if (it != frame_types_.end())
+                type = it->second;
+
+            sprintf(str, "ln#%10lu / thread#%21lu: %s %s origin ip=%u.%u.%u.%u listen port=%5u hostname=%21s seq=%10u crc=%s data_sz=%u data=%255s\n",
+                    ln++, std::hash<std::thread::id>()(std::this_thread::get_id()),
+                    direction, type.c_str(), reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[0],
+                    reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[1],
+                    reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[2],
+                    reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[3],
+                    frame.details.origin_listen_port, host, frame.details.sequence,
+                    crc ? "ok " : "nok", frame.details.data_len, data);
+
+            debug_logging::g_logger.log(str);
+        }
+
+
+    private:
+
+        std::map<unsigned, std::string> frame_types_;
 };
 
 static Frame_Logger logger;
@@ -60,13 +116,6 @@ bool is_buffer_empty(const void* buffer)
         return true;
     else
         return false;
-}
-
-Frame frame_from_buffer(void* buffer)
-{
-    Frame frame;
-    memcpy(frame.bytes, buffer, sizeof(frame.bytes));
-    return frame;
 }
 
 Frame_Type frame_type(void* buffer)
@@ -139,6 +188,8 @@ void Protocol::send_frame(size_t timeout)
     memcpy(frame.bytes, write_buffer_, sizeof(frame.bytes));
     size_t expected_bytes = frame.details.data_len + sizeof(frame.bytes);
 
+    logger.log(write_buffer_, "->");
+
     size_t sent_bytes = l1_transport_->write(write_buffer_, expected_bytes, remote_, timeout);
     if (sent_bytes != expected_bytes)
         THROW2(exceptions::Size_Mismatch, expected_bytes, sent_bytes);
@@ -160,6 +211,8 @@ recv_again:
 
     if (received_bytes != expected_bytes)
         THROW2(exceptions::Size_Mismatch, expected_bytes, received_bytes);
+
+    logger.log(read_buffer_, "<-");
 
     unsigned short crc_expected, crc_actual;
     if (!crc_check(read_buffer_, expected_bytes, &crc_expected, &crc_actual))
