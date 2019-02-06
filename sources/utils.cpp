@@ -205,6 +205,8 @@ namespace debug_logging
             {
                 std::lock_guard lock(l->mutex_);
                 messages = l->messages_;
+                std::queue<std::string> empty;
+                l->messages_.swap(empty);
             }
 
             while (messages.size() > 0)

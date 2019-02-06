@@ -27,14 +27,12 @@ class Frame_Logger
 
         void log(void* buf, char* direction)
         {
-            static long unsigned int ln = 0;
-
             if (!buf || !direction)
                 return;
 
-            bool crc = crc_check(buf, Max_Frame_Size);
-
             Frame frame(frame_from_buffer(buf));
+            bool crc = crc_check(buf, sizeof(Frame::bytes) + frame.details.data_len);
+
             char str[1024];
             char host[21];
             char data[255];
@@ -50,8 +48,8 @@ class Frame_Logger
             if (it != frame_types_.end())
                 type = it->second;
 
-            sprintf(str, "ln#%10lu / thread#%21lu: %s %s origin ip=%u.%u.%u.%u listen port=%5u hostname=%21s seq=%10u crc=%s data_sz=%u data=%255s\n",
-                    ln++, std::hash<std::thread::id>()(std::this_thread::get_id()),
+            sprintf(str, "ln#%10lu / thread#%21lu: %s %s origin ip=%u.%u.%u.%u listen port=%5u hostname=%21s seq=%10u crc=%s data_sz=%u data=%s\n",
+                    ln_++, std::hash<std::thread::id>()(std::this_thread::get_id()),
                     direction, type.c_str(), reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[0],
                     reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[1],
                     reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[2],
@@ -66,6 +64,7 @@ class Frame_Logger
     private:
 
         std::map<unsigned, std::string> frame_types_;
+        long unsigned int ln_ = 0;
 };
 
 static Frame_Logger logger;
@@ -154,6 +153,11 @@ Frame Protocol::make_frame(Frame_Type type, size_t data_len, const void* data)
     {
         if (frame.details.type == Frame_Type::Data_Frame)
             frame.details.sequence = send_sequence_++;
+    }
+
+    if (frame.details.type != Frame_Type::Data_Frame)
+    {
+        frame.details.sequence = 0;
     }
 
     frame.details.origin_ip = local_.ip;
@@ -687,7 +691,7 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
             take_from_storage(stored_writes_, data.details.sequence, write_buffer_);
             send_frame(op_timeout_);
 
-            if ((send_sequence_ % this->no_ack_count_) == 0)
+            if ((data.details.sequence % this->no_ack_count_) == 0)
             {
                 recv_frame = receive_frame(op_timeout_);
                 if (recv_frame.details.type != Frame_Type::Ack_Frame)
