@@ -2,6 +2,7 @@
 
 #include <fplog_exceptions.h>
 #include <sprot.h>
+#include <random>
 
 #ifndef _WIN32
 
@@ -65,6 +66,10 @@ class Udp_Transport: public sprot::Extended_Transport_Interface
         const int read_buffer_size_ = 1024 * 256;
         int bytes_in_buffer_;
         int read_position_ = 0;
+
+        int chaos_rate_ = 0;
+        int chaos_counter_ = 0;
+        std::mt19937 chaos_gen_;
 };
 
 };

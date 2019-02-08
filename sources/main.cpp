@@ -473,6 +473,10 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
     sprot::Params params;
     sprot::Param p;
 
+    p.first = "chaos";
+    p.second = "124";
+    params.insert(p);
+
     p.first = "ip";
     p.second = "127.0.0.1";
     params.insert(p);
@@ -484,6 +488,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
     t1.enable(params);
 
     params["port"] = "26261";
+    params["chaos"] = "50";
 
     t2.enable(params);
 

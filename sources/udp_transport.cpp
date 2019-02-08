@@ -95,6 +95,20 @@ void Udp_Transport::enable(const Params& params)
         port = params.find("PORT")->second;
     }
 
+    std::string chaos_rate = "0";
+
+    if (params.find("chaos") != params.end())
+    {
+        chaos_rate = params.find("chaos")->second;
+    }
+
+    if (params.find("CHAOS") != params.end())
+    {
+        chaos_rate = params.find("CHAOS")->second;
+    }
+
+    chaos_rate_ = std::stoi(chaos_rate);
+
     const unsigned char localhost[4] = {127, 0, 0, 1};
     if (memcmp(ip_, localhost, sizeof(localhost)) == 0)
         localhost_ = true;
@@ -238,6 +252,20 @@ buffered_read:
         user_data.ip = buffered_ip;
         user_data.port = buffered_port;
 
+        if (chaos_rate_ != 0)
+        {
+            if (chaos_counter_ == chaos_rate_)
+            {
+                debug_logging::g_logger.log("chaos inserted!\n");
+                std::uniform_int_distribution<int> pos_range(0, min_len);
+                reinterpret_cast<char*>(buf)[pos_range(chaos_gen_)] = 'F';
+
+                chaos_counter_ = 1;
+            }
+            else
+                chaos_counter_++;
+        }
+
         return static_cast<size_t>(min_len);
     }
     else
@@ -306,6 +334,20 @@ buffered_read:
         {
             bytes_in_buffer_ = res;
             goto buffered_read;
+        }
+
+        if (chaos_rate_ != 0)
+        {
+            if (chaos_counter_ == chaos_rate_)
+            {
+                debug_logging::g_logger.log("chaos inserted!\n");
+                std::uniform_int_distribution<int> pos_range(0, res);
+                reinterpret_cast<char*>(buf)[pos_range(chaos_gen_)] = 'F';
+
+                chaos_counter_ = 1;
+            }
+            else
+                chaos_counter_++;
         }
 
         return static_cast<size_t>(res);
@@ -393,7 +435,8 @@ size_t Udp_Transport::write(const void* buf, size_t buf_size, Address& user_data
 }
 
 Udp_Transport::Udp_Transport():
-enabled_(false)
+enabled_(false),
+chaos_gen_(31337)
 {
     bytes_in_buffer_ = 0;
     read_buffer_ = new char[read_buffer_size_];
