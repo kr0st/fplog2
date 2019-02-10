@@ -20,6 +20,7 @@
 #endif
 
 #ifdef __linux__
+#include <netinet/in.h>
 #define SPROT_API
 #endif
 

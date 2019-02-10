@@ -10,6 +10,7 @@
 #include <fstream>
 #include <queue>
 #include <thread>
+#include <mutex>
 
 template<typename T>
 struct std::hash<std::vector<T>>
