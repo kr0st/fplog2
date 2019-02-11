@@ -244,6 +244,9 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
             else
                 current_bytes = basic->write(send_buf, how_much, 5000);
 
+            if (current_bytes != how_much)
+                THROW(fplog::exceptions::Write_Failed);
+
             fwrite(send_buf, current_bytes, 1, file);
 
             bytes_written += current_bytes;
@@ -295,6 +298,9 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
                 current_bytes = extended->read(read_buf, sprot::implementation::Max_Frame_Size, origin, 5000);
             else
                 current_bytes = basic->read(read_buf, sprot::implementation::Max_Frame_Size, 5000);
+
+            if (current_bytes == 0)
+                THROW(fplog::exceptions::Read_Failed);
 
             fwrite(read_buf, current_bytes, 1, file);
 
