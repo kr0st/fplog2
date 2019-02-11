@@ -44,7 +44,7 @@ namespace debug_logging
             Logger();
             ~Logger();
 
-            bool open(char* file);
+            bool open(const char* file);
             void log(const std::string& message);
 
 

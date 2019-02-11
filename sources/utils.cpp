@@ -175,7 +175,7 @@ namespace debug_logging
         messages_.push(message);
     }
 
-    bool Logger::open(char* file)
+    bool Logger::open(const char* file)
     {
         if (!file)
             return false;

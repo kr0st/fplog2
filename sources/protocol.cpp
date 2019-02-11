@@ -25,7 +25,7 @@ class Frame_Logger
             frame_types_[i++] = "RR";
         }
 
-        void log(void* buf, char* direction)
+        void log(void* buf, const char* direction)
         {
             if (!buf || !direction)
                 return;
