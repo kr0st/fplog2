@@ -307,7 +307,11 @@ bool Protocol::connect(const Params& local_config, Address remote, size_t timeou
     };
 
     generic_util::Retryable handshake(send_handshake, max_retries_);
-    return handshake.run();
+
+    connected_ = handshake.run();
+    acceptor_ = false;
+
+    return connected_;
 }
 
 bool Protocol::accept(const Params& local_config, Address remote, size_t timeout)
@@ -374,7 +378,10 @@ bool Protocol::accept(const Params& local_config, Address remote, size_t timeout
     };
 
     generic_util::Retryable handshake(recv_handshake, max_retries_);
-    return handshake.run();
+    connected_ = handshake.run();
+    acceptor_ = true;
+
+    return connected_;
 }
 
 size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
@@ -386,6 +393,9 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
         THROW(fplog::exceptions::Buffer_Overflow);
 
     std::lock_guard lock(mutex_);
+
+    if (!connected_)
+        THROW(fplog::exceptions::Not_Connected);
 
     auto process_recovered = [&]() -> unsigned int
     {
@@ -497,6 +507,7 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
                 return len;
         }
 
+        connected_ = false;
         THROW(exceptions::Connection_Broken);
     }
 }
@@ -549,9 +560,10 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
         read_data();
 
     std::vector <unsigned int> missing;
-    for (unsigned int seq = recv_sequence_; seq == last_received_sequence; )
+    for (unsigned int seq = recv_sequence_; seq != last_received_sequence; )
     {
-        if (stored_reads_.find(seq) == stored_reads_.end())
+        auto found_frame = stored_reads_.find(seq);
+        if (found_frame == stored_reads_.end())
             missing.push_back(seq);
 
         if (seq == UINT32_MAX)
@@ -640,7 +652,7 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
         recovered_frames_.swap(empty);
     }
 
-    for (unsigned int seq = stored_seq; seq == last_received_sequence; )
+    for (unsigned int seq = stored_seq; seq != last_received_sequence; )
     {
         if (stored_reads_.find(seq) == stored_reads_.end())
             missing.push_back(seq);
@@ -673,6 +685,9 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
         THROW(fplog::exceptions::Buffer_Overflow);
 
     std::lock_guard lock(mutex_);
+
+    if (!connected_)
+        THROW(fplog::exceptions::Not_Connected);
 
     fplog::exceptions::Generic_Exception last_known_exception;
     bool exception_happened = false;
@@ -756,6 +771,7 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
             return buf_size;
         else
         {
+            connected_ = false;
             THROW(exceptions::Connection_Broken);
         }
     }
@@ -770,6 +786,7 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
     }
     catch (...)
     {
+        connected_ = false;
         THROW(exceptions::Connection_Broken);
     }
 }
@@ -806,7 +823,10 @@ retrans_again:
             {
                 take_from_storage(stored_writes_, resend_frames[i], write_buffer_);
                 if (memcmp(write_buffer_, empty_buffer_, Max_Frame_Size) == 0)
+                {
+                    connected_ = false;
                     THROW(exceptions::Connection_Broken);
+                }
                 send_frame(op_timeout_);
             }
 
@@ -830,6 +850,7 @@ retrans_again:
         }
         catch (exceptions::Connection_Broken& e)
         {
+            connected_ = false;
             throw e;
         }
         catch (exceptions::Repeat_Retransmit& e)

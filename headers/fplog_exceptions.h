@@ -179,4 +179,14 @@ public:
     }
 };
 
+class Not_Connected : public Generic_Exception
+{
+public:
+
+    Not_Connected(const char* facility, const char* file = "", int line = 0, const char* message = "Transport or protocol is missing.") :
+        Generic_Exception(facility, file, line, message)
+    {
+    }
+};
+
 }};
