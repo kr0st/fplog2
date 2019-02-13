@@ -24,7 +24,9 @@ void Packet_Router::reader_thread(Packet_Router* p)
             implementation::Frame frame;
             memcpy(frame.bytes, read_buffer, sizeof(implementation::Frame::bytes));
 
-            if ((frame.details.type == implementation::Frame_Type::Data_Frame) && (frame.details.data_len > 0) && (frame.details.data_len <= implementation::Mtu))
+            if (((frame.details.type == implementation::Frame_Type::Data_Frame) ||
+                 (frame.details.type == implementation::Frame_Type::Retransmit_Frame)) &&
+                    (frame.details.data_len > 0) && (frame.details.data_len <= implementation::Mtu))
             {
                 read_bytes += p->l0_transport_->read(&(read_buffer[sizeof(implementation::Frame::bytes)]), frame.details.data_len, read_ext_data, 250);
             }

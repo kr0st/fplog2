@@ -587,6 +587,14 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
                 make_frame(Frame_Type::Retransmit_Frame, rr_count * sizeof(unsigned int), &(missing[rr_from]));
 
             send_frame(op_timeout_);
+
+            if (!send_ack)
+            {
+                Frame ack = receive_frame(op_timeout_);
+                if (ack.details.type != Frame_Type::Ack_Frame)
+                    return false;
+            }
+
             return true;
         }
         catch (fplog::exceptions::Timeout&)
@@ -626,7 +634,8 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
                 rr_count--;
             }
 
-            ack_or_rr.run();
+            if(!ack_or_rr.run())
+                return false; //retransmit failed
         }
 
         if (!missing.empty())
@@ -818,6 +827,9 @@ retrans_again:
 
         try
         {
+
+            make_frame(Ack_Frame);
+            send_frame(op_timeout_);
 
             for (size_t i = 0; i < resend_frames.size(); ++i)
             {
