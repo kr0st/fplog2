@@ -175,7 +175,7 @@ namespace debug_logging
         messages_.push(message);
     }
 
-    bool Logger::open(const char* file)
+    bool Logger::open(const char* file, bool unbuffered)
     {
         if (!file)
             return false;
@@ -186,6 +186,9 @@ namespace debug_logging
             fclose(log_);
 
         log_ = fopen(file, "wt");
+
+        if (unbuffered)
+            setbuf(log_, nullptr);
 
         return (log_ != nullptr);
     }
