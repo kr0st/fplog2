@@ -520,6 +520,8 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
     bool any_data = false;
     unsigned int stored_seq = recv_sequence_;
 
+    bool expect_ack = false;
+
     auto read_data = [&]() -> bool
     {
         check_time_out(timeout, timer_start);
@@ -527,6 +529,15 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
         try
         {
             frame = receive_frame(op_timeout_);
+
+            if (expect_ack)
+            {
+                if (frame.details.type != Frame_Type::Ack_Frame)
+                    return false;
+                else
+                    expect_ack = false;
+            }
+
             if (frame.details.type != Frame_Type::Data_Frame)
                 return false;
             else
@@ -640,6 +651,8 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
 
         if (!missing.empty())
         {
+            expect_ack = true;
+
             generic_util::Retryable receive_missing(read_data, max_retries_);
             any_data = true;
 
@@ -804,7 +817,7 @@ bool Protocol::retransmit_response(std::chrono::time_point<std::chrono::system_c
 {
 retrans_again:
 
-    Frame retransmit(frame_from_buffer(write_buffer_));
+    Frame retransmit(frame_from_buffer(read_buffer_));
 
     if (retransmit.details.data_len < sizeof(unsigned int))
         return false;
@@ -816,7 +829,7 @@ retrans_again:
     std::vector<unsigned int> resend_frames;
     resend_frames.resize(count);
 
-    memcpy(&(resend_frames[0]), write_buffer_ + sizeof(Frame::bytes), retransmit.details.data_len);
+    memcpy(&(resend_frames[0]), read_buffer_ + sizeof(Frame::bytes), retransmit.details.data_len);
 
     unsigned char empty_buffer_[Max_Frame_Size];
     memset(empty_buffer_, 0, Max_Frame_Size);
