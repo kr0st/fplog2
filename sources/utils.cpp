@@ -171,8 +171,11 @@ namespace debug_logging
 
     void Logger::log(const std::string& message)
     {
-        std::lock_guard lock(mutex_);
-        messages_.push(message);
+        if (log_)
+        {
+            std::lock_guard lock(mutex_);
+            messages_.push(message);
+        }
     }
 
     bool Logger::open(const char* file, bool unbuffered)
