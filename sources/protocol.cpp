@@ -227,7 +227,9 @@ recv_again:
         trim_storage(stored_reads_);
 
         if (stored_reads_.find(frame.details.sequence) != stored_reads_.end())
+        {
             goto recv_again;
+        }
 
         put_in_storage(stored_reads_, frame.details.sequence, read_buffer_);
 
@@ -450,6 +452,9 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
                 if ((frame.details.sequence % this->no_ack_count_) == 0)
                 {
                     make_frame(Frame_Type::Ack_Frame);
+
+                    //sending double ack
+                    send_frame(op_timeout_);
                     send_frame(op_timeout_);
                 }
 

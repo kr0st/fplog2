@@ -29,6 +29,8 @@ void Packet_Router::reader_thread(Packet_Router* p)
                     (frame.details.data_len > 0) && (frame.details.data_len <= implementation::Mtu))
             {
                 read_bytes += p->l0_transport_->read(&(read_buffer[sizeof(implementation::Frame::bytes)]), frame.details.data_len, read_ext_data, 250);
+                if (read_bytes != (sizeof(implementation::Frame::bytes) + frame.details.data_len))
+                    continue;
             }
 
             if (!implementation::crc_check(read_buffer, read_bytes))
