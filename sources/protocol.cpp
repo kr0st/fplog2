@@ -598,7 +598,11 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
         try
         {
             if (send_ack)
+            {
                 make_frame(Frame_Type::Ack_Frame);
+                //sending double ACK
+                send_frame(op_timeout_);
+            }
             else
                 make_frame(Frame_Type::Retransmit_Frame, rr_count * sizeof(unsigned int), &(missing[rr_from]));
 
