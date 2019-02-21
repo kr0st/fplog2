@@ -169,6 +169,21 @@ namespace debug_logging
         writer_.join();
     }
 
+    void Logger::log(const char* func, const char* file, const int line, const char* msg)
+    {
+        if (!(func && file && msg))
+            return;
+
+        size_t len = strlen(func) + strlen(file) + strlen(msg);
+        char str[2048];
+
+        if (len > sizeof(str) - 16)
+            return;
+
+        sprintf(str, "in %s file @ %d, %s: %s\n", file, line, func, msg);
+        log(str);
+    }
+
     void Logger::log(const std::string& message)
     {
         if (log_)

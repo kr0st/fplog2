@@ -25,10 +25,10 @@
 
 #endif
 
-#define THROW(exception_type) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__); }
-#define THROW1(exception_type, param1) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, param1); }
-#define THROW2(exception_type, param1, param2) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, param1, param2); }
-#define THROWM(exception_type, message) { throw exception_type(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, message); }
+#define THROW(exception_type) { exception_type e(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__); debug_logging::g_logger.log(e.what()); throw e; }
+#define THROW1(exception_type, param1) { exception_type e(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, param1); debug_logging::g_logger.log(e.what()); throw e; }
+#define THROW2(exception_type, param1, param2) { exception_type e(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, param1, param2); debug_logging::g_logger.log(e.what()); throw e; }
+#define THROWM(exception_type, message) { exception_type e(__FUNCTION__, __SHORT_FORM_OF_FILE__, __LINE__, message); debug_logging::g_logger.log(e.what()); throw e; }
 
 #ifdef __linux__
 #define NO_ITOA
