@@ -188,8 +188,15 @@ namespace debug_logging
     {
         if (log_)
         {
+            char str[2048];
+
+            if (message.length() > sizeof(str) - 16)
+                return;
+
+            sprintf(str, "thread#%21lu: %s", std::hash<std::thread::id>()(std::this_thread::get_id()), message.c_str());
+
             std::lock_guard lock(mutex_);
-            messages_.push(message);
+            messages_.push(str);
         }
     }
 

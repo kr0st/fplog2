@@ -48,8 +48,8 @@ class Frame_Logger
             if (it != frame_types_.end())
                 type = it->second;
 
-            sprintf(str, "ln#%10lu / thread#%21lu: %s %s origin ip=%u.%u.%u.%u listen port=%5u hostname=%21s seq=%10u crc=%s data_sz=%u data=%s\n",
-                    ln_++, std::hash<std::thread::id>()(std::this_thread::get_id()),
+            sprintf(str, "ln#%10lu: %s %s origin ip=%u.%u.%u.%u listen port=%5u hostname=%21s seq=%10u crc=%s data_sz=%u data=%s\n",
+                    ln_++,
                     direction, type.c_str(), reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[0],
                     reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[1],
                     reinterpret_cast<unsigned char*>(&(frame.details.origin_ip))[2],
@@ -453,7 +453,7 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
                 {
                     make_frame(Frame_Type::Ack_Frame);
 
-                    //sending double ack
+                    //sending double ack for increased stability
                     send_frame(op_timeout_);
                     send_frame(op_timeout_);
                 }
@@ -531,16 +531,19 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
     {
         check_time_out(timeout, timer_start);
 
+read_again:
+
         try
         {
             frame = receive_frame(op_timeout_);
 
             if (expect_ack)
             {
-                if (frame.details.type != Frame_Type::Ack_Frame)
-                    return false;
-                else
+                if (frame.details.type == Frame_Type::Ack_Frame)
+                {
                     expect_ack = false;
+                    goto read_again;
+                }
             }
 
             if (frame.details.type != Frame_Type::Data_Frame)
@@ -572,8 +575,14 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
         }
     };
 
+    unsigned int read_failures = 0;
     while ((last_received_sequence % no_ack_count_) != 0)
-        read_data();
+    {
+        if (!read_data())
+            read_failures++;
+        if (read_failures >= max_retries_)
+            break;
+    }
 
     std::vector <unsigned int> missing;
     for (unsigned int seq = recv_sequence_; seq != last_received_sequence; )
@@ -600,7 +609,8 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
             if (send_ack)
             {
                 make_frame(Frame_Type::Ack_Frame);
-                //sending double ACK
+
+                //sending double ack for increased stability
                 send_frame(op_timeout_);
             }
             else
@@ -676,12 +686,23 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
             break;
     }
 
-    missing.clear();
 
     {
         std::queue<unsigned int> empty;
         recovered_frames_.swap(empty);
     }
+
+    if ((stored_seq == last_received_sequence) && !missing.empty())
+    {
+        missing.clear();
+
+        if (stored_reads_.find(stored_seq) == stored_reads_.end())
+            missing.push_back(stored_seq);
+        else
+            recovered_frames_.push(stored_seq);
+    }
+    else
+        missing.clear();
 
     for (unsigned int seq = stored_seq; seq != last_received_sequence; )
     {

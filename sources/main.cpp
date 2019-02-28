@@ -413,7 +413,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Protocol_Test, DISABLED_Smoke_Test)
+TEST(Protocol_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -514,7 +514,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
 
         EXPECT_NO_THROW(p2.accept(params, remote, 5000));
 
-        read_bytes1 = read_from_transport(12621400, std::string("reader1.txt"), &p2);
+        read_bytes1 = read_from_transport(1262140, std::string("reader1.txt"), &p2);
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -527,7 +527,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
         params["port"] = "26260";
         EXPECT_NO_THROW(p1.connect(params, remote, 5000));
 
-        sent_bytes1 = write_to_transport(12621400, std::string("writer1.txt"), &g_rng1, &p1);
+        sent_bytes1 = write_to_transport(1262140, std::string("writer1.txt"), &g_rng1, &p1);
     });
 
     writer1.join();
