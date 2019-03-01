@@ -602,6 +602,9 @@ read_again:
 
     auto send_ack_or_retransmit = [&]() -> bool
     {
+        if (read_failures >= max_retries_)
+            return true;
+
         check_time_out(timeout, timer_start);
 
         try

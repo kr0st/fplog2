@@ -294,6 +294,9 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
         {
             unsigned long current_bytes = 0;
 
+            if ((bytes_to_read - bytes_read) == 43)
+                current_bytes = 0;
+
             if (extended)
                 current_bytes = extended->read(read_buf, sprot::implementation::Max_Frame_Size, origin, 5000);
             else
