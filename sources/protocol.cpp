@@ -233,12 +233,18 @@ recv_again:
 
         put_in_storage(stored_reads_, frame.details.sequence, read_buffer_);
 
+        if (frame.details.sequence == 38)
+            frame.details.sequence = 38;
+
         if (frame.details.sequence == recv_sequence_)
         {
             if (recv_sequence_ == UINT32_MAX)
                 recv_sequence_ = 0;
             else
                 recv_sequence_++;
+
+            if (recv_sequence_ == 36)
+                recv_sequence_ = 36;
         }
     }
 
@@ -411,12 +417,15 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
 
             memcpy(buf, read_buffer_ + sizeof(frame.bytes), frame.details.data_len);
 
-            if (recovered_frames_.empty())
+            if (recovered_frames_.empty() || (recv_sequence_ <= frame.details.sequence))
             {
                 if (frame.details.sequence == UINT32_MAX)
                     recv_sequence_ = 0;
                 else
                     recv_sequence_ = frame.details.sequence + 1;
+            if (recv_sequence_ == 36)
+                recv_sequence_ = 36;
+
             }
 
             return frame.details.data_len;
@@ -523,7 +532,7 @@ bool Protocol::retransmit_request(std::chrono::time_point<std::chrono::system_cl
 {
     Frame frame;
     bool any_data = false;
-    unsigned int stored_seq = recv_sequence_;
+    unsigned int stored_seq = recv_sequence_, max_received_squence = last_received_sequence;
 
     bool expect_ack = false;
 
@@ -549,11 +558,12 @@ read_again:
             if (frame.details.type != Frame_Type::Data_Frame)
                 return false;
             else
-                last_received_sequence = frame.details.sequence;
+                if (max_received_squence < frame.details.sequence)
+                    max_received_squence = frame.details.sequence;
 
             if (!any_data)
             {
-                if ((last_received_sequence % no_ack_count_) == 0)
+                if ((max_received_squence % no_ack_count_) == 0)
                     return true;
             }
             else
@@ -576,7 +586,7 @@ read_again:
     };
 
     unsigned int read_failures = 0;
-    while ((last_received_sequence % no_ack_count_) != 0)
+    while ((max_received_squence % no_ack_count_) != 0)
     {
         if (!read_data())
             read_failures++;
@@ -585,7 +595,7 @@ read_again:
     }
 
     std::vector <unsigned int> missing;
-    for (unsigned int seq = recv_sequence_; seq != last_received_sequence; )
+    for (unsigned int seq = recv_sequence_; seq != max_received_squence; )
     {
         auto found_frame = stored_reads_.find(seq);
         if (found_frame == stored_reads_.end())
@@ -695,7 +705,7 @@ read_again:
         recovered_frames_.swap(empty);
     }
 
-    if ((stored_seq == last_received_sequence) && !missing.empty())
+    if ((stored_seq == max_received_squence) && !missing.empty())
     {
         missing.clear();
 
@@ -707,7 +717,7 @@ read_again:
     else
         missing.clear();
 
-    for (unsigned int seq = stored_seq; seq != last_received_sequence; )
+    for (unsigned int seq = stored_seq; seq != max_received_squence; )
     {
         if (stored_reads_.find(seq) == stored_reads_.end())
             missing.push_back(seq);
@@ -719,6 +729,11 @@ read_again:
         else
             seq++;
     }
+
+    if (missing.empty() && (recv_sequence_ <= max_received_squence))
+        recv_sequence_ = max_received_squence + 1;
+    if (recv_sequence_ == 36)
+        recv_sequence_ = 36;
 
     if (missing.empty() && (!send_ack))
     {
