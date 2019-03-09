@@ -475,7 +475,72 @@ TEST(Protocol_Test, Smoke_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
+TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
+{
+    sprot::Udp_Transport t1, t2;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    p.first = "chaos";
+    p.second = "0";
+    params.insert(p);
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26260";
+    params.insert(p);
+
+    t1.enable(params);
+
+    params["port"] = "26261";
+    params["chaos"] = "0";
+
+    t2.enable(params);
+
+    sprot::Packet_Router r1(&t1);
+    sprot::Packet_Router r2(&t2);
+
+    sprot::implementation::Protocol p1(&r1);
+    sprot::implementation::Protocol p2(&r2);
+
+    unsigned long read_bytes1 = 0;
+    unsigned long sent_bytes1 = 0;
+
+    std::thread reader1([&]{
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26260;
+
+        EXPECT_NO_THROW(p2.accept(params, remote, 5000));
+
+        read_bytes1 = read_from_transport(1262140, std::string("reader2.txt"), &p2);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+    std::thread writer1([&]{
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26261;
+
+        params["port"] = "26260";
+        EXPECT_NO_THROW(p1.connect(params, remote, 5000));
+
+        sent_bytes1 = write_to_transport(1262140, std::string("writer2.txt"), &g_rng1, &p1);
+    });
+
+    writer1.join();
+
+    reader1.join();
+
+    EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
+}
+
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -542,7 +607,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1)
 
 int main(int argc, char **argv)
 {
-    debug_logging::g_logger.open("fplog2-test-log.txt");
+    //debug_logging::g_logger.open("fplog2-test-log.txt");
 
     ::testing::InitGoogleTest(&argc, argv);
     int res = RUN_ALL_TESTS();

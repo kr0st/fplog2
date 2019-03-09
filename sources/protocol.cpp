@@ -233,18 +233,12 @@ recv_again:
 
         put_in_storage(stored_reads_, frame.details.sequence, read_buffer_);
 
-        if (frame.details.sequence == 38)
-            frame.details.sequence = 38;
-
         if (frame.details.sequence == recv_sequence_)
         {
             if (recv_sequence_ == UINT32_MAX)
                 recv_sequence_ = 0;
             else
                 recv_sequence_++;
-
-            if (recv_sequence_ == 36)
-                recv_sequence_ = 36;
         }
     }
 
@@ -417,15 +411,12 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
 
             memcpy(buf, read_buffer_ + sizeof(frame.bytes), frame.details.data_len);
 
-            if (recovered_frames_.empty() || (recv_sequence_ <= frame.details.sequence))
+            if (recv_sequence_ <= frame.details.sequence)
             {
                 if (frame.details.sequence == UINT32_MAX)
                     recv_sequence_ = 0;
                 else
                     recv_sequence_ = frame.details.sequence + 1;
-            if (recv_sequence_ == 36)
-                recv_sequence_ = 36;
-
             }
 
             return frame.details.data_len;
@@ -717,7 +708,7 @@ read_again:
     else
         missing.clear();
 
-    for (unsigned int seq = stored_seq; seq != max_received_squence; )
+    for (unsigned int seq = stored_seq; seq <= max_received_squence; )
     {
         if (stored_reads_.find(seq) == stored_reads_.end())
             missing.push_back(seq);
@@ -732,8 +723,6 @@ read_again:
 
     if (missing.empty() && (recv_sequence_ <= max_received_squence))
         recv_sequence_ = max_received_squence + 1;
-    if (recv_sequence_ == 36)
-        recv_sequence_ = 36;
 
     if (missing.empty() && (!send_ack))
     {
