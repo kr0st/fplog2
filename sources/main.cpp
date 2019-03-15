@@ -416,7 +416,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Protocol_Test, Smoke_Test)
+TEST(Protocol_Test, DISABLED_Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -515,7 +515,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
         remote.ip = 0x0100007f;
         remote.port = 26260;
 
-        EXPECT_NO_THROW(p2.accept(params, remote, 5000));
+        EXPECT_NO_THROW(p2.accept(params, remote, 15000));
 
         read_bytes1 = read_from_transport(1262140, std::string("reader2.txt"), &p2);
     });
@@ -528,7 +528,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
         remote.port = 26261;
 
         params["port"] = "26260";
-        EXPECT_NO_THROW(p1.connect(params, remote, 5000));
+        EXPECT_NO_THROW(p1.connect(params, remote, 15000));
 
         sent_bytes1 = write_to_transport(1262140, std::string("writer2.txt"), &g_rng1, &p1);
     });
@@ -580,7 +580,7 @@ TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
         remote.ip = 0x0100007f;
         remote.port = 26260;
 
-        EXPECT_NO_THROW(p2.accept(params, remote, 5000));
+        EXPECT_NO_THROW(p2.accept(params, remote, 15000));
 
         read_bytes1 = read_from_transport(1262140, std::string("reader1.txt"), &p2);
     });
@@ -593,7 +593,7 @@ TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
         remote.port = 26261;
 
         params["port"] = "26260";
-        EXPECT_NO_THROW(p1.connect(params, remote, 5000));
+        EXPECT_NO_THROW(p1.connect(params, remote, 15000));
 
         sent_bytes1 = write_to_transport(1262140, std::string("writer1.txt"), &g_rng1, &p1);
     });
@@ -607,7 +607,7 @@ TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
 
 int main(int argc, char **argv)
 {
-    //debug_logging::g_logger.open("fplog2-test-log.txt");
+    debug_logging::g_logger.open("fplog2-test-log.txt");
 
     ::testing::InitGoogleTest(&argc, argv);
     int res = RUN_ALL_TESTS();

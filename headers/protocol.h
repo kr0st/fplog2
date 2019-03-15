@@ -35,6 +35,7 @@ class Protocol: public Protocol_Interface
 
         unsigned int send_sequence_ = 0;
         unsigned int recv_sequence_ = 0;
+        unsigned int prev_seq_ = UINT32_MAX - 2;
 
         ///options
         const unsigned int no_ack_count_ = 5;

@@ -136,6 +136,7 @@ Frame Protocol::make_frame(Frame_Type type, size_t data_len, const void* data)
     {
         send_sequence_ = 0;
         recv_sequence_ = 0;
+        prev_seq_ = UINT32_MAX - 2;
     }
 
     frame.details.type = type;
@@ -228,6 +229,9 @@ recv_again:
 
         if (stored_reads_.find(frame.details.sequence) != stored_reads_.end())
         {
+            if ((frame.details.sequence % no_ack_count_) == 0)
+                return frame;
+
             goto recv_again;
         }
 
@@ -357,6 +361,10 @@ bool Protocol::accept(const Params& local_config, Address remote, size_t timeout
             empty_storage(stored_writes_);
             empty_storage(stored_reads_);
 
+            send_sequence_ = 0;
+            recv_sequence_ = 0;
+            prev_seq_ = UINT32_MAX - 2;
+
             return true;
         }
         catch (fplog::exceptions::Timeout&)
@@ -458,8 +466,16 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
                     send_frame(op_timeout_);
                 }
 
-                memcpy(buf, read_buffer_ + sizeof(frame.bytes), frame.details.data_len);
-                return true;
+                if (prev_seq_ != frame.details.sequence)
+                {
+                    prev_seq_ = frame.details.sequence;
+                    memcpy(buf, read_buffer_ + sizeof(frame.bytes), frame.details.data_len);
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
             }
             else
                 THROW2(sprot::exceptions::Wrong_Number, recv_sequence_, (frame.details.sequence + 1));
