@@ -181,6 +181,21 @@ void Udp_Transport::enable(const Params& params)
         THROW(fplog::exceptions::Connect_Failed);
     }
 
+    //Setting bigger socket receive and send buffers
+    int sock_buf_sz =  256 * 1024;
+    if (setsockopt(socket_, SOL_SOCKET, SO_RCVBUF, &sock_buf_sz, sizeof(sock_buf_sz)) != 0)
+    {
+        closesocket(socket_);
+        THROW(fplog::exceptions::Connect_Failed);
+    }
+
+    sock_buf_sz =  256 * 1024;
+    if (setsockopt(socket_, SOL_SOCKET, SO_SNDBUF, &sock_buf_sz, sizeof(sock_buf_sz)) != 0)
+    {
+        closesocket(socket_);
+        THROW(fplog::exceptions::Connect_Failed);
+    }
+
     enabled_ = true;
 }
 
@@ -321,13 +336,13 @@ buffered_read:
 
     if (res != SOCKET_ERROR)
     {
+        buffered_port = ntohs(remote_addr.sin_port);
+        buffered_ip = remote_addr.sin_addr.s_addr;
+
         if (!null_data(user_data))
         {
-            user_data.ip = remote_addr.sin_addr.s_addr;
-            user_data.port = ntohs(remote_addr.sin_port);
-
-            buffered_port = user_data.port;
-            buffered_ip = user_data.ip;
+            user_data.ip = buffered_ip;
+            user_data.port = buffered_port;
         }
 
         if (buffered)

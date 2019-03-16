@@ -240,9 +240,9 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
             recipient.port = real_recipient_listen_port;
 
             if (extended)
-                current_bytes = extended->write(send_buf, how_much, recipient, 5000);
+                current_bytes = extended->write(send_buf, how_much, recipient, 10000);
             else
-                current_bytes = basic->write(send_buf, how_much, 5000);
+                current_bytes = basic->write(send_buf, how_much, 10000);
 
             if (current_bytes != how_much)
                 THROW(fplog::exceptions::Write_Failed);
@@ -298,9 +298,9 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
                 current_bytes = 0;
 
             if (extended)
-                current_bytes = extended->read(read_buf, sprot::implementation::Max_Frame_Size, origin, 5000);
+                current_bytes = extended->read(read_buf, sprot::implementation::Max_Frame_Size, origin, 10000);
             else
-                current_bytes = basic->read(read_buf, sprot::implementation::Max_Frame_Size, 5000);
+                current_bytes = basic->read(read_buf, sprot::implementation::Max_Frame_Size, 10000);
 
             if (current_bytes == 0)
                 THROW(fplog::exceptions::Read_Failed);

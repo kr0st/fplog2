@@ -42,7 +42,7 @@ class Protocol: public Protocol_Interface
         const unsigned int storage_max_ = 100;
         const unsigned int storage_trim_ = 50;
         const unsigned int op_timeout_ = 500;
-        const unsigned int max_retries_ = 10;
+        const unsigned int max_retries_ = 20;
         ///options
 
         std::recursive_mutex mutex_;
