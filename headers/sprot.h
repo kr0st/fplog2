@@ -279,7 +279,7 @@ namespace implementation
         Frame frame;
         memcpy(frame.bytes, buffer, sizeof(frame.bytes));
 
-        unsigned short crc_expected = generic_util::gen_crc16(static_cast<unsigned char*>(buffer) + 2, static_cast<unsigned short>(sz) - 2);
+        unsigned short crc_expected = generic_util::gen_simple_crc16(static_cast<unsigned char*>(buffer) + 2, static_cast<unsigned short>(sz) - 2);
         unsigned short crc_actual = frame.details.crc;
 
         if (expected)

@@ -267,6 +267,43 @@ bool compare_files(const std::string& filename1, const std::string& filename2)
     return range_equal(begin1, end, begin2, end);
 }
 
+uint16_t gen_simple_crc16(const uint8_t *data, uint16_t size)
+{
+    //return gen_crc16(data, size);
+
+    uint16_t op1 = 0;
+    uint16_t op2 = 0;
+    uint16_t ops_xor = 0;
+    uint16_t total_xor = 0;
+
+    int bytes_left = size;
+
+    while (bytes_left > 0)
+    {
+        op1 = 0;
+        op2 = 0;
+
+        int copy_size = sizeof(op1);
+        if (copy_size > bytes_left)
+            copy_size = bytes_left;
+
+        memcpy(&op1, data + size - bytes_left, static_cast<size_t>(copy_size));
+        bytes_left -= copy_size;
+
+        copy_size = sizeof(op2);
+        if (copy_size > bytes_left)
+            copy_size = bytes_left;
+
+        memcpy(&op2, data + size - bytes_left, static_cast<size_t>(copy_size));
+        bytes_left -= copy_size;
+
+        ops_xor = op1 ^ op2;
+        total_xor = total_xor ^ ops_xor;
+    }
+
+    return total_xor;
+}
+
 uint16_t gen_crc16(const uint8_t *data, uint16_t size)
 {
     uint16_t out = 0;

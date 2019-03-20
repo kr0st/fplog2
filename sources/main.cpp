@@ -103,7 +103,7 @@ TEST(L1_Transport_Test, DISABLED_Smoke_Test)
     memcpy(send_buf, frame.bytes, sizeof(frame.bytes));
     memcpy(send_buf + sizeof(frame.bytes), message, strlen(message));
 
-    unsigned short crc = generic_util::gen_crc16(send_buf + 2, static_cast<unsigned short>(sizeof(frame.bytes) + strlen(message)) - 2);
+    unsigned short crc = generic_util::gen_simple_crc16(send_buf + 2, static_cast<unsigned short>(sizeof(frame.bytes) + strlen(message)) - 2);
     unsigned short *pcrc = reinterpret_cast<unsigned short*>(&send_buf[0]);
     *pcrc = crc;
 
@@ -185,7 +185,7 @@ unsigned short fill_buffer_with_frame_and_random_data(unsigned char* buf, unsign
     memcpy(buf, frame.bytes, sizeof(frame.bytes));
     randomize_buffer(buf + sizeof(frame.bytes), data_len, rng);
 
-    unsigned short crc = generic_util::gen_crc16(buf + 2, static_cast<unsigned short>(sizeof(frame.bytes) + data_len) - 2);
+    unsigned short crc = generic_util::gen_simple_crc16(buf + 2, static_cast<unsigned short>(sizeof(frame.bytes) + data_len) - 2);
     unsigned short *pcrc = reinterpret_cast<unsigned short*>(buf);
     *pcrc = crc;
 
@@ -475,7 +475,7 @@ TEST(Protocol_Test, DISABLED_Smoke_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_No_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -540,7 +540,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
-TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
+TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -607,7 +607,7 @@ TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
 
 int main(int argc, char **argv)
 {
-    debug_logging::g_logger.open("fplog2-test-log.txt");
+    //debug_logging::g_logger.open("fplog2-test-log.txt");
 
     ::testing::InitGoogleTest(&argc, argv);
     int res = RUN_ALL_TESTS();

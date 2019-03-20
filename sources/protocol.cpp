@@ -30,6 +30,9 @@ class Frame_Logger
             if (!buf || !direction)
                 return;
 
+            if (!debug_logging::g_logger.enabled())
+                return;
+
             Frame frame(frame_from_buffer(buf));
             bool crc = crc_check(buf, sizeof(Frame::bytes) + frame.details.data_len);
 
@@ -171,7 +174,7 @@ Frame Protocol::make_frame(Frame_Type type, size_t data_len, const void* data)
     if (data && (data_len > 0))
         memcpy(write_buffer_ + sizeof(frame.bytes), data, data_len);
 
-    unsigned short crc = generic_util::gen_crc16(write_buffer_ + 2, static_cast<unsigned short>(sizeof(frame.bytes) + data_len) - 2);
+    unsigned short crc = generic_util::gen_simple_crc16(write_buffer_ + 2, static_cast<unsigned short>(sizeof(frame.bytes) + data_len) - 2);
     unsigned short *pcrc = reinterpret_cast<unsigned short*>(&write_buffer_[0]);
     *pcrc = crc;
 

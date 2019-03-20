@@ -47,6 +47,7 @@ namespace debug_logging
             bool open(const char* file, bool unbuffered = true);
             void log(const char* func, const char* file, const int line, const char* msg);
             void log(const std::string& message);
+            bool enabled(){ return (log_ != nullptr); }
 
 
         private:
@@ -87,6 +88,7 @@ struct Retryable
 };
 
 uint16_t gen_crc16(const uint8_t *data, uint16_t size);
+uint16_t gen_simple_crc16(const uint8_t *data, uint16_t size);
 
 template<typename InputIterator1, typename InputIterator2>
 bool
