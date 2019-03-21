@@ -22,7 +22,7 @@ void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
     buf[len - 1] = '\n';
 }
 
-TEST(Udp_Transport_Test, DISABLED_Smoke_Test)
+TEST(Udp_Transport_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -63,7 +63,7 @@ TEST(Udp_Transport_Test, DISABLED_Smoke_Test)
     EXPECT_EQ(memcmp(message, recv_buf, strlen(message)), 0);
 }
 
-TEST(L1_Transport_Test, DISABLED_Smoke_Test)
+TEST(L1_Transport_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -251,7 +251,7 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
 
             bytes_written += current_bytes;
 
-            std::this_thread::sleep_for(std::chrono::microseconds(1800));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
     catch (fplog::exceptions::Generic_Exception& e)
@@ -326,7 +326,7 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
     return bytes_read;
 }
 
-TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -358,7 +358,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26262;
 
-        read_bytes1 = read_from_transport(2621400, std::string("reader1.txt"), nullptr, &r1, origin_data);
+        read_bytes1 = read_from_transport(2621440, std::string("reader1.txt"), nullptr, &r1, origin_data);
     });
 
     std::thread reader2([&]{
@@ -366,7 +366,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26263;
 
-        read_bytes2 = read_from_transport(2621400, std::string("reader2.txt"), nullptr, &r1, origin_data);
+        read_bytes2 = read_from_transport(2621440, std::string("reader2.txt"), nullptr, &r1, origin_data);
     });
 
     std::thread reader3([&]{
@@ -374,7 +374,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26264;
 
-        read_bytes3 = read_from_transport(2621400, std::string("reader3.txt"), nullptr, &r1, origin_data);
+        read_bytes3 = read_from_transport(2621440, std::string("reader3.txt"), nullptr, &r1, origin_data);
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -384,7 +384,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26262;
 
-        sent_bytes1 = write_to_transport(2621400, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data, 26260);
+        sent_bytes1 = write_to_transport(2621440, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer2([&]{
@@ -392,7 +392,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26263;
 
-        sent_bytes2 = write_to_transport(2621400, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data, 26260);
+        sent_bytes2 = write_to_transport(2621440, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer3([&]{
@@ -400,7 +400,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26264;
 
-        sent_bytes3 = write_to_transport(2621400, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data, 26260);
+        sent_bytes3 = write_to_transport(2621440, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data, 26260);
     });
 
     writer1.join();
@@ -416,7 +416,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Protocol_Test, DISABLED_Smoke_Test)
+TEST(Protocol_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -475,7 +475,7 @@ TEST(Protocol_Test, DISABLED_Smoke_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_No_Simulated_Errors)
+TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -582,9 +582,8 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
 
         EXPECT_NO_THROW(p2.accept(params, remote, 15000));
 
-        read_bytes1 = read_from_transport(1262140, std::string("reader1.txt"), &p2);
+        read_bytes1 = read_from_transport(4096000, std::string("reader1.txt"), &p2);
     });
-
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
     std::thread writer1([&]{
@@ -595,7 +594,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
         params["port"] = "26260";
         EXPECT_NO_THROW(p1.connect(params, remote, 15000));
 
-        sent_bytes1 = write_to_transport(1262140, std::string("writer1.txt"), &g_rng1, &p1);
+        sent_bytes1 = write_to_transport(4096000, std::string("writer1.txt"), &g_rng1, &p1);
     });
 
     writer1.join();
@@ -607,7 +606,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
 
 int main(int argc, char **argv)
 {
-    //debug_logging::g_logger.open("fplog2-test-log.txt");
+    debug_logging::g_logger.open("fplog2-test-log.txt");
 
     ::testing::InitGoogleTest(&argc, argv);
     int res = RUN_ALL_TESTS();

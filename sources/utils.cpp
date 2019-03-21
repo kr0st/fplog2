@@ -188,7 +188,7 @@ namespace debug_logging
     {
         if (log_)
         {
-            char str[2048];
+            char str[6000];
 
             if (message.length() > sizeof(str) - 16)
                 return;

@@ -36,9 +36,9 @@ class Frame_Logger
             Frame frame(frame_from_buffer(buf));
             bool crc = crc_check(buf, sizeof(Frame::bytes) + frame.details.data_len);
 
-            char str[1024];
+            char str[5000];
             char host[21];
-            char data[255];
+            char data[5000];
 
             memset(data, 0, sizeof(data));
             memcpy(data, static_cast<char*>(buf) + sizeof(frame.bytes), frame.details.data_len);
