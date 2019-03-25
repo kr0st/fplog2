@@ -1,4 +1,4 @@
-
+﻿
 #include <stdio.h>
 #include <iostream>
 #include <date/date.h>
@@ -21,146 +21,6 @@ void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
         buf[i] = range(*rng);
     buf[len - 1] = '\n';
 }
-
-TEST(Udp_Transport_Test, Smoke_Test)
-{
-    sprot::Udp_Transport t1, t2;
-
-    sprot::Params params;
-    sprot::Param p;
-
-    p.first = "ip";
-    p.second = "127.0.0.1";
-    params.insert(p);
-
-    p.first = "port";
-    p.second = "26258";
-    params.insert(p);
-
-    t1.enable(params);
-
-    params["port"] = "26259";
-
-    t2.enable(params);
-
-    unsigned char send_buf[255];
-    unsigned char recv_buf[255];
-
-    memset(send_buf, 0, sizeof(send_buf));
-    memset(recv_buf, 0, sizeof(recv_buf));
-
-    const char* message = "hello world?";
-    memcpy(send_buf, message, strlen(message));
-
-    sprot::Address recepient, origin;
-    recepient.ip = 0x0100007f;
-    recepient.port = 26259;
-
-    t1.write(send_buf, strlen(message), recepient);
-
-    size_t read_bytes = t2.read(recv_buf, sizeof(recv_buf), origin);
-    EXPECT_EQ(read_bytes, strlen(message));
-    EXPECT_EQ(memcmp(message, recv_buf, strlen(message)), 0);
-}
-
-TEST(L1_Transport_Test, Smoke_Test)
-{
-    sprot::Udp_Transport t1, t2;
-
-    sprot::Params params;
-    sprot::Param p;
-
-    p.first = "ip";
-    p.second = "127.0.0.1";
-    params.insert(p);
-
-    p.first = "port";
-    p.second = "26260";
-    params.insert(p);
-
-    t1.enable(params);
-
-    params["port"] = "26261";
-
-    t2.enable(params);
-
-    unsigned char send_buf[255];
-    unsigned char recv_buf[255];
-
-    memset(send_buf, 0, sizeof(send_buf));
-    memset(recv_buf, 0, sizeof(recv_buf));
-
-    const char* message = "hello world?";
-
-    sprot::implementation::Frame frame;
-    frame.details.data_len = static_cast<unsigned short>(strlen(message));
-    sprintf(frame.details.hostname, "WORKSTATION-666");
-    frame.details.type = sprot::implementation::Frame_Type::Data_Frame;
-    frame.details.sequence = 999;
-    frame.details.origin_ip = 0x0100007f;
-    frame.details.origin_listen_port = 26261;
-
-    memcpy(send_buf, frame.bytes, sizeof(frame.bytes));
-    memcpy(send_buf + sizeof(frame.bytes), message, strlen(message));
-
-    unsigned short crc = generic_util::gen_simple_crc16(send_buf + 2, static_cast<unsigned short>(sizeof(frame.bytes) + strlen(message)) - 2);
-    unsigned short *pcrc = reinterpret_cast<unsigned short*>(&send_buf[0]);
-    *pcrc = crc;
-
-    sprot::Address recepient, origin, unknown_origin;
-    recepient.ip = 0x0100007f;
-    recepient.port = 26260;
-
-    origin.ip = 0x0100007f;
-    origin.port = 26261;
-
-
-    sprot::Packet_Router r1(&t1);
-    bool sending = true;
-
-    std::thread sender([&]
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        sprot::Packet_Router r2(&t2);
-
-        while (sending)
-            r2.write(send_buf, strlen(message) + sizeof (frame.bytes), recepient);
-    });
-
-    size_t received_bytes = r1.read(recv_buf, sizeof (recv_buf), origin);
-
-    frame.details.crc = crc;
-
-    {
-        sprot::implementation::Frame received_frame;
-        memcpy(received_frame.bytes, recv_buf, sizeof(received_frame.bytes));
-
-        EXPECT_EQ(received_bytes, strlen(message) + sizeof (frame.bytes));
-        EXPECT_EQ(memcmp(frame.bytes, received_frame.bytes, sizeof(frame.bytes)), 0);
-        EXPECT_EQ(memcmp(message, recv_buf + sizeof(frame.bytes), strlen(message)), 0);
-    }
-
-    memset(recv_buf, 0, sizeof(recv_buf));
-
-    received_bytes = r1.read(recv_buf, sizeof (recv_buf), unknown_origin);
-
-    sending = false;
-
-    {
-        sprot::implementation::Frame received_frame;
-        memcpy(received_frame.bytes, recv_buf, sizeof(received_frame.bytes));
-
-        EXPECT_EQ(received_bytes, strlen(message) + sizeof (frame.bytes));
-        EXPECT_EQ(memcmp(frame.bytes, received_frame.bytes, sizeof(frame.bytes)), 0);
-        EXPECT_EQ(memcmp(message, recv_buf + sizeof(frame.bytes), strlen(message)), 0);
-
-        sprot::Address tuple1(origin), tuple2(unknown_origin);
-        EXPECT_EQ(tuple1, tuple2);
-    }
-
-    sender.join();
-}
-
 static std::mt19937 g_rng1(31337);
 static std::mt19937 g_rng2(31338);
 static std::mt19937 g_rng3(31339);
@@ -326,7 +186,198 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
     return bytes_read;
 }
 
-TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
+TEST(Udp_Transport_Test, Smoke_Test)
+{
+    sprot::Udp_Transport t1, t2;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26258";
+    params.insert(p);
+
+    t1.enable(params);
+
+    params["port"] = "26259";
+
+    t2.enable(params);
+
+    unsigned char send_buf[255];
+    unsigned char recv_buf[255];
+
+    memset(send_buf, 0, sizeof(send_buf));
+    memset(recv_buf, 0, sizeof(recv_buf));
+
+    const char* message = "hello world?";
+    memcpy(send_buf, message, strlen(message));
+
+    sprot::Address recepient, origin;
+    recepient.ip = 0x0100007f;
+    recepient.port = 26259;
+
+    t1.write(send_buf, strlen(message), recepient);
+
+    size_t read_bytes = t2.read(recv_buf, sizeof(recv_buf), origin);
+    EXPECT_EQ(read_bytes, strlen(message));
+    EXPECT_EQ(memcmp(message, recv_buf, strlen(message)), 0);
+}
+
+TEST(Udp_Transport_Test, Read_Write_1x1)
+{
+    sprot::Udp_Transport t1, t2;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    p.first = "chaos";
+    p.second = "0";
+    params.insert(p);
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26260";
+    params.insert(p);
+
+    t1.enable(params);
+
+    params["port"] = "26261";
+    t2.enable(params);
+
+    unsigned long read_bytes1 = 0;
+    unsigned long sent_bytes1 = 0;
+
+    std::thread reader1([&]{
+
+        sprot::Address origin;
+        origin.ip = 0x0100007f;
+        origin.port = 26261;
+
+        read_bytes1 = read_from_transport(1262140, std::string("reader3.txt"), nullptr, &t1, origin);
+    });
+
+    std::thread writer1([&]{
+
+        sprot::Address recepient;
+        recepient.ip = 0x0100007f;
+        recepient.port = 26260;
+
+        sent_bytes1 = write_to_transport(1262140, std::string("writer3.txt"), &g_rng1, nullptr, &t2, recepient, recepient.port);
+    });
+
+    writer1.join();
+    reader1.join();
+
+    EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
+}
+
+TEST(L1_Transport_Test, Smoke_Test)
+{
+    sprot::Udp_Transport t1, t2;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26260";
+    params.insert(p);
+
+    t1.enable(params);
+
+    params["port"] = "26261";
+
+    t2.enable(params);
+
+    unsigned char send_buf[255];
+    unsigned char recv_buf[255];
+
+    memset(send_buf, 0, sizeof(send_buf));
+    memset(recv_buf, 0, sizeof(recv_buf));
+
+    const char* message = "hello world?";
+
+    sprot::implementation::Frame frame;
+    frame.details.data_len = static_cast<unsigned short>(strlen(message));
+    sprintf(frame.details.hostname, "WORKSTATION-666");
+    frame.details.type = sprot::implementation::Frame_Type::Data_Frame;
+    frame.details.sequence = 999;
+    frame.details.origin_ip = 0x0100007f;
+    frame.details.origin_listen_port = 26261;
+
+    memcpy(send_buf, frame.bytes, sizeof(frame.bytes));
+    memcpy(send_buf + sizeof(frame.bytes), message, strlen(message));
+
+    unsigned short crc = generic_util::gen_simple_crc16(send_buf + 2, static_cast<unsigned short>(sizeof(frame.bytes) + strlen(message)) - 2);
+    unsigned short *pcrc = reinterpret_cast<unsigned short*>(&send_buf[0]);
+    *pcrc = crc;
+
+    sprot::Address recepient, origin, unknown_origin;
+    recepient.ip = 0x0100007f;
+    recepient.port = 26260;
+
+    origin.ip = 0x0100007f;
+    origin.port = 26261;
+
+
+    sprot::Packet_Router r1(&t1);
+    bool sending = true;
+
+    std::thread sender([&]
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        sprot::Packet_Router r2(&t2);
+
+        while (sending)
+            r2.write(send_buf, strlen(message) + sizeof (frame.bytes), recepient);
+    });
+
+    size_t received_bytes = r1.read(recv_buf, sizeof (recv_buf), origin);
+
+    frame.details.crc = crc;
+
+    {
+        sprot::implementation::Frame received_frame;
+        memcpy(received_frame.bytes, recv_buf, sizeof(received_frame.bytes));
+
+        EXPECT_EQ(received_bytes, strlen(message) + sizeof (frame.bytes));
+        EXPECT_EQ(memcmp(frame.bytes, received_frame.bytes, sizeof(frame.bytes)), 0);
+        EXPECT_EQ(memcmp(message, recv_buf + sizeof(frame.bytes), strlen(message)), 0);
+    }
+
+    memset(recv_buf, 0, sizeof(recv_buf));
+
+    received_bytes = r1.read(recv_buf, sizeof (recv_buf), unknown_origin);
+
+    sending = false;
+
+    {
+        sprot::implementation::Frame received_frame;
+        memcpy(received_frame.bytes, recv_buf, sizeof(received_frame.bytes));
+
+        EXPECT_EQ(received_bytes, strlen(message) + sizeof (frame.bytes));
+        EXPECT_EQ(memcmp(frame.bytes, received_frame.bytes, sizeof(frame.bytes)), 0);
+        EXPECT_EQ(memcmp(message, recv_buf + sizeof(frame.bytes), strlen(message)), 0);
+
+        sprot::Address tuple1(origin), tuple2(unknown_origin);
+        EXPECT_EQ(tuple1, tuple2);
+    }
+
+    sender.join();
+}
+
+
+TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -475,7 +526,7 @@ TEST(Protocol_Test, Smoke_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_No_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -540,7 +591,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
