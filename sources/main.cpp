@@ -260,7 +260,7 @@ TEST(Udp_Transport_Test, Read_Write_1x1)
         origin.ip = 0x0100007f;
         origin.port = 26261;
 
-        read_bytes1 = read_from_transport(1262140, std::string("reader3.txt"), nullptr, &t1, origin);
+        read_bytes1 = read_from_transport(12621400, std::string("reader3.txt"), nullptr, &t1, origin);
     });
 
     std::thread writer1([&]{
@@ -269,13 +269,61 @@ TEST(Udp_Transport_Test, Read_Write_1x1)
         recepient.ip = 0x0100007f;
         recepient.port = 26260;
 
-        sent_bytes1 = write_to_transport(1262140, std::string("writer3.txt"), &g_rng1, nullptr, &t2, recepient, recepient.port);
+        sent_bytes1 = write_to_transport(12621400, std::string("writer3.txt"), &g_rng1, nullptr, &t2, recepient, recepient.port);
     });
 
     writer1.join();
     reader1.join();
 
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
+}
+
+TEST(Udp_Transport_Test, Read_Write_Same_Socket)
+{
+    sprot::Udp_Transport t1;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    p.first = "chaos";
+    p.second = "0";
+    params.insert(p);
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26260";
+    params.insert(p);
+
+    t1.enable(params);
+
+    unsigned long read_bytes1 = 0;
+    unsigned long sent_bytes1 = 0;
+
+    std::thread reader1([&]{
+
+        sprot::Address origin;
+        origin.ip = 0x0100007f;
+        origin.port = 26260;
+
+        read_bytes1 = read_from_transport(12621400, std::string("reader1.txt"), nullptr, &t1, origin);
+    });
+
+    std::thread writer1([&]{
+
+        sprot::Address recepient;
+        recepient.ip = 0x0100007f;
+        recepient.port = 26260;
+
+        sent_bytes1 = write_to_transport(12621400, std::string("writer1.txt"), &g_rng1, nullptr, &t1, recepient, recepient.port);
+    });
+
+    writer1.join();
+    reader1.join();
+
+    EXPECT_TRUE(generic_util::compare_files("reader1.txt", "writer1.txt"));
 }
 
 TEST(L1_Transport_Test, Smoke_Test)
@@ -377,7 +425,7 @@ TEST(L1_Transport_Test, Smoke_Test)
 }
 
 
-TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -409,7 +457,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26262;
 
-        read_bytes1 = read_from_transport(2621440, std::string("reader1.txt"), nullptr, &r1, origin_data);
+        read_bytes1 = read_from_transport(26214400, std::string("reader1.txt"), nullptr, &r1, origin_data);
     });
 
     std::thread reader2([&]{
@@ -417,7 +465,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26263;
 
-        read_bytes2 = read_from_transport(2621440, std::string("reader2.txt"), nullptr, &r1, origin_data);
+        read_bytes2 = read_from_transport(26214400, std::string("reader2.txt"), nullptr, &r1, origin_data);
     });
 
     std::thread reader3([&]{
@@ -425,7 +473,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26264;
 
-        read_bytes3 = read_from_transport(2621440, std::string("reader3.txt"), nullptr, &r1, origin_data);
+        read_bytes3 = read_from_transport(26214400, std::string("reader3.txt"), nullptr, &r1, origin_data);
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -435,7 +483,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26262;
 
-        sent_bytes1 = write_to_transport(2621440, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data, 26260);
+        sent_bytes1 = write_to_transport(26214400, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer2([&]{
@@ -443,7 +491,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26263;
 
-        sent_bytes2 = write_to_transport(2621440, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data, 26260);
+        sent_bytes2 = write_to_transport(26214400, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer3([&]{
@@ -451,7 +499,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26264;
 
-        sent_bytes3 = write_to_transport(2621440, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data, 26260);
+        sent_bytes3 = write_to_transport(26214400, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data, 26260);
     });
 
     writer1.join();

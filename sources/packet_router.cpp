@@ -133,7 +133,7 @@ Packet_Router::Read_Request Packet_Router::schedule_read(Address& user_data, siz
 
     while (duplicate)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(3));
         sprot::implementation::check_time_out(timeout, timer_start);
 
         std::lock_guard lock(waitlist_mutex_);
