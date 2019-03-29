@@ -787,6 +787,16 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
             if ((data.details.sequence % this->no_ack_count_) == 0)
             {
                 recv_frame = receive_frame(op_timeout_);
+
+                try
+                {
+                    //receiving second ACK, it does not matter if one ACK is lost
+                    //so if something happens here we still have 1 valid ACK received
+                    //and thus could safely ignore exceptions in this case
+                    receive_frame(op_timeout_);
+                }
+                catch (...){}
+
                 if (recv_frame.details.type != Frame_Type::Ack_Frame)
                     THROW2(exceptions::Unexpected_Frame, Frame_Type::Ack_Frame, recv_frame.details.type);
             }
@@ -912,6 +922,14 @@ retrans_again:
             }
 
             Frame ack_rr(receive_frame(op_timeout_));
+
+            try
+            {
+                //receiving second failsafe ACK
+                //as first one is received successfully any issues here could be ignored
+                receive_frame(op_timeout_);
+
+            } catch (...){}
 
             if (ack_rr.details.type == Frame_Type::Ack_Frame)
                 return true;

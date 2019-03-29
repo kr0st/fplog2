@@ -256,7 +256,7 @@ namespace implementation
 
     enum Frame_Type
     {
-        Handshake_Frame = 0x13,
+        Handshake_Frame = 0x13, //19 dec
         Goodbye_Frame,
         Ack_Frame,
         Nack_Frame,
