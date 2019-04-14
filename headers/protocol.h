@@ -31,7 +31,7 @@ class Protocol: public Protocol_Interface
     private:
 
         bool connected_ = false, acceptor_ = false;
-        Address local_, remote_;
+        Address local_, remote_, accepted_remote_;
 
         unsigned int send_sequence_ = 0;
         unsigned int recv_sequence_ = 0;

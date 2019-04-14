@@ -3,6 +3,7 @@
 
 #include <sprot.h>
 #include <map>
+#include <queue>
 #include <condition_variable>
 #include <mutex>
 #include <utils.h>
@@ -31,12 +32,11 @@ class Packet_Router: public Extended_Transport_Interface
         {
             unsigned char read_buffer[implementation::Max_Frame_Size];
             size_t read_bytes = 0;
-            std::mutex* mutex = nullptr;
-            std::condition_variable* wait = nullptr;
+            volatile bool done = false;
             Address read_ext_data;
         };
 
-        std::map<Address, Read_Request> waitlist_;
+        std::map<Address, std::vector<Read_Request*>> waitlist_;
         std::mutex waitlist_mutex_;
 
         Read_Request schedule_read(Address& user_data, size_t timeout = infinite_wait);

@@ -12,7 +12,7 @@ void Packet_Router::reader_thread(Packet_Router* p)
     while (!p->stop_reading_)
     {
         Address read_ext_data;
-        Read_Request req;
+        Read_Request* req(nullptr);
 
         try
         {
@@ -55,32 +55,84 @@ void Packet_Router::reader_thread(Packet_Router* p)
 
                 std::lock_guard lock(p->waitlist_mutex_);
 
-                if (p->waitlist_.find(tuple) != p->waitlist_.end())
-                    req = p->waitlist_[tuple];
+                auto q_iter = p->waitlist_.find(tuple);
+                if (q_iter != p->waitlist_.end())
+                {
+                    std::vector<Read_Request*> q(q_iter->second);
+                    if (q.size() == 0)
+                    {
+                        req = new Read_Request();
+                        q.push_back(req);
+                    }
+                    else
+                    {
+                        auto it(q.begin());
+
+                        for (; it != q.end(); ++it)
+                        {
+                            if ((*it) && !(*it)->done)
+                            {
+                                req = *it;
+                                break;
+                            }
+                        }
+
+                        if (it == q.end())
+                        {
+                            req = new Read_Request();
+                            q.push_back(req);
+                        }
+                    }
+                }
                 else
                 {
                     Address empty_tuple;
-                    if (p->waitlist_.find(empty_tuple) != p->waitlist_.end())
+                    q_iter = p->waitlist_.find(empty_tuple);
+
+                    tuple = empty_tuple;
+
+                    if (q_iter != p->waitlist_.end())
                     {
-                        req = p->waitlist_[empty_tuple];
-                        tuple = empty_tuple;
+                        std::vector<Read_Request*> q(q_iter->second);
+                        if (q.size() == 0)
+                        {
+                            req = new Read_Request();
+                            q.push_back(req);
+                        }
+                        else
+                        {
+                            auto it(q.begin());
+
+                            for (; it != q.end(); ++it)
+                            {
+                                if ((*it) && !(*it)->done)
+                                {
+                                    req = *it;
+                                    break;
+                                }
+                            }
+
+                            if (it == q.end())
+                            {
+                                req = new Read_Request();
+                                q.push_back(req);
+                            }
+                        }
                     }
                     else
-                        continue;
+                    {
+                        req = new Read_Request();
+                        std::vector <Read_Request*> q;
+                        q.push_back(req);
+                        p->waitlist_[tuple] = q;
+                    }
                 }
 
-                req.read_bytes = read_bytes;
-                memcpy(req.read_buffer, read_buffer, read_bytes);
-                req.read_ext_data = read_ext_data;
+                req->read_bytes = read_bytes;
+                memcpy(req->read_buffer, read_buffer, read_bytes);
+                req->read_ext_data = read_ext_data;
 
-                if (!req.mutex)
-                    req.mutex = new std::mutex();
-                if (!req.wait)
-                    req.wait = new std::condition_variable();
-
-                p->waitlist_[tuple] = req;
-
-                req.wait->notify_all();
+                req->done = true;
             }
         }
         catch (std::exception&)
@@ -92,9 +144,6 @@ void Packet_Router::reader_thread(Packet_Router* p)
             continue;
         }
     }
-
-    bool ending_now;
-    ending_now = true;
 }
 
 Packet_Router::Packet_Router(Extended_Transport_Interface* l0_transport):
@@ -106,88 +155,94 @@ reader_(std::bind(Packet_Router::reader_thread, this))
 
 Packet_Router::Read_Request Packet_Router::schedule_read(Address& user_data, size_t timeout)
 {   
-    Read_Request req;
+    Read_Request* req;
+    size_t req_num;
+    std::vector<Read_Request*>* queue;
+
     Address tuple(user_data);
 
-    auto timer_start(sprot::implementation::check_time_out(timeout));
-
-    bool duplicate = false;
+    auto timer_start = sprot::implementation::check_time_out(timeout);
 
     {
         std::lock_guard lock(waitlist_mutex_);
-        std::map<Address, Read_Request>::iterator res(waitlist_.find(tuple));
-
-        if ( res != waitlist_.end())
-            duplicate = true;
-
-        if (res == waitlist_.end())
-        {
-            req.mutex = new std::mutex();
-            req.wait = new std::condition_variable();
-
-            waitlist_[tuple] = req;
-        }
-        else
-            req = res->second;
-    }
-
-    while (duplicate)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(3));
-        sprot::implementation::check_time_out(timeout, timer_start);
-
-        std::lock_guard lock(waitlist_mutex_);
-        std::map<Address, Read_Request>::iterator res(waitlist_.find(tuple));
+        std::map<Address, std::vector<Read_Request*>>::iterator res(waitlist_.find(tuple));
 
         if (res != waitlist_.end())
-            duplicate = true;
+        {
+            if (res->second.size() == 0)
+            {
+                req = new Read_Request();
+                queue = &res->second;
+                res->second.push_back(req);
+                req_num = res->second.size() - 1;
+            }
+            else
+            {
+                for (req_num = 0; req_num < res->second.size(); req_num++)
+                    if ((res->second[req_num]) && (res->second[req_num]->done))
+                    {
+                        req = res->second[req_num];
+                        queue = &res->second;
+                        break;
+                    }
+
+                if (req_num == res->second.size())
+                {
+                    for (req_num = 0; req_num < res->second.size(); req_num++)
+                        if ((res->second[req_num]) && (!res->second[req_num]->done))
+                        {
+                            req = res->second[req_num];
+                            queue = &res->second;
+                            break;
+                        }
+
+                    if (req_num == res->second.size())
+                    {
+                        //queue has only deleted requests, clear it completely
+                        req = new Read_Request();
+                        queue = &res->second;
+                        res->second.push_back(req);
+                        req_num = res->second.size() - 1;
+                    }
+                }
+            }
+        }
         else
         {
-            req.mutex = new std::mutex();
-            req.wait = new std::condition_variable();
+            req = new Read_Request();
 
-            waitlist_[tuple] = req;
+            std::vector<Read_Request*> q;
+            q.push_back(req);
 
-            duplicate = false;
+            waitlist_[tuple] = q;
+            req_num = 0;
+
+            queue = &waitlist_[tuple];
         }
     }
 
-    std::unique_lock ulock(*req.mutex);
-    if (req.wait->wait_for(ulock, std::chrono::milliseconds(timeout)) == std::cv_status::timeout)
+    try
     {
-        ulock.release();
+        while (!req->done)
+        {
+            implementation::check_time_out(timeout, timer_start);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        Read_Request result(*req);
 
         std::lock_guard lock(waitlist_mutex_);
 
-        std::map<Address, Read_Request>::iterator res(waitlist_.find(tuple));
+        delete req;
+        (*queue)[req_num] = nullptr;
 
-        delete res->second.wait;
-        delete res->second.mutex;
-        res->second.wait = nullptr;
-        res->second.mutex = nullptr;
-
-        waitlist_.erase(res);
-
-        THROW(fplog::exceptions::Timeout);
+        return result;
     }
-
-    ulock.release();
-
+    catch (fplog::exceptions::Timeout&)
     {
-        std::lock_guard lock(waitlist_mutex_);
-        std::map<Address, Read_Request>::iterator res(waitlist_.find(tuple));
-
-        delete res->second.wait;
-        delete res->second.mutex;
-        res->second.wait = nullptr;
-        res->second.mutex = nullptr;
-
-        req = res->second;
-
-        waitlist_.erase(res);
     }
 
-    return req;
+    return Read_Request();
 }
 
 size_t Packet_Router::read(void* buf, size_t buf_size, Address& user_data, size_t timeout)

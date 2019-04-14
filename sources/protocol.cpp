@@ -210,7 +210,9 @@ Frame Protocol::receive_frame(size_t timeout)
 
 recv_again:
 
-    size_t received_bytes = l1_transport_->read(read_buffer_, Max_Frame_Size, remote_, timeout);
+    accepted_remote_ = remote_;
+
+    size_t received_bytes = l1_transport_->read(read_buffer_, Max_Frame_Size, accepted_remote_, timeout);
 
     Frame frame;
     memcpy(frame.bytes, read_buffer_, sizeof(frame.bytes));
@@ -329,6 +331,7 @@ bool Protocol::accept(const Params& local_config, Address remote, size_t timeout
 
     local_.from_params(local_config);
     remote_ = remote;
+    accepted_remote_ = remote_;
 
     memset(localhost_, 0, sizeof(localhost_));
 
@@ -394,6 +397,9 @@ bool Protocol::accept(const Params& local_config, Address remote, size_t timeout
     connected_ = handshake.run();
     acceptor_ = true;
 
+    if (connected_)
+        remote_ = accepted_remote_;
+
     return connected_;
 }
 
@@ -453,6 +459,22 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
         try
         {
             frame = receive_frame(op_timeout_);
+
+            if (frame.details.type == Frame_Type::Handshake_Frame)
+            {
+                make_frame(Frame_Type::Ack_Frame);
+                send_frame(op_timeout_);
+
+                empty_storage(stored_writes_);
+                empty_storage(stored_reads_);
+
+                send_sequence_ = 0;
+                recv_sequence_ = 0;
+                prev_seq_ = UINT32_MAX - 2;
+
+                frame = receive_frame(op_timeout_);
+            }
+
             if (frame.details.type != Frame_Type::Data_Frame)
                 return false;
 

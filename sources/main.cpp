@@ -457,7 +457,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26262;
 
-        read_bytes1 = read_from_transport(26214400, std::string("reader1.txt"), nullptr, &r1, origin_data);
+        read_bytes1 = read_from_transport(2621440, std::string("reader1.txt"), nullptr, &r1, origin_data);
     });
 
     std::thread reader2([&]{
@@ -465,7 +465,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26263;
 
-        read_bytes2 = read_from_transport(26214400, std::string("reader2.txt"), nullptr, &r1, origin_data);
+        read_bytes2 = read_from_transport(2621440, std::string("reader2.txt"), nullptr, &r1, origin_data);
     });
 
     std::thread reader3([&]{
@@ -473,7 +473,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26264;
 
-        read_bytes3 = read_from_transport(26214400, std::string("reader3.txt"), nullptr, &r1, origin_data);
+        read_bytes3 = read_from_transport(2621440, std::string("reader3.txt"), nullptr, &r1, origin_data);
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -483,7 +483,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26262;
 
-        sent_bytes1 = write_to_transport(26214400, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data, 26260);
+        sent_bytes1 = write_to_transport(2621440, std::string("writer1.txt"), &g_rng1, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer2([&]{
@@ -491,7 +491,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26263;
 
-        sent_bytes2 = write_to_transport(26214400, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data, 26260);
+        sent_bytes2 = write_to_transport(2621440, std::string("writer2.txt"), &g_rng2, nullptr, &r2, origin_data, 26260);
     });
 
     std::thread writer3([&]{
@@ -499,7 +499,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
         origin_data.ip = 0x0100007f;
         origin_data.port = 26264;
 
-        sent_bytes3 = write_to_transport(26214400, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data, 26260);
+        sent_bytes3 = write_to_transport(2621440, std::string("writer3.txt"), &g_rng3, nullptr, &r2, origin_data, 26260);
     });
 
     writer1.join();
@@ -557,24 +557,22 @@ TEST(Protocol_Test, Smoke_Test)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
-    {
-        sprot::Address remote;
-        remote.ip = 0x0100007f;
-        remote.port = 26261;
+    sprot::Address remote;
+    remote.ip = 0x0100007f;
+    remote.port = 26261;
 
-        params["port"] = "26260";
-        EXPECT_NO_THROW(p1.connect(params, remote, 5000));
+    params["port"] = "26260";
+    EXPECT_NO_THROW(p1.connect(params, remote, 5000));
 
-        unsigned char buf[sprot::implementation::Max_Frame_Size];
-        sprintf(reinterpret_cast<char*>(buf), "hello world");
+    unsigned char buf[sprot::implementation::Max_Frame_Size];
+    sprintf(reinterpret_cast<char*>(buf), "hello world");
 
-        EXPECT_NO_THROW(p1.write(buf, strlen("hello world") + 1, 5000));
-    }
+    EXPECT_NO_THROW(p1.write(buf, strlen("hello world") + 1, 5000));
 
     reader.join();
 }
 
-TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_No_Simulated_Errors)
+TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -639,7 +637,7 @@ TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_No_Simulated_Errors)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -665,11 +663,11 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
 
     t2.enable(params);
 
-    //sprot::Packet_Router r1(&t1);
-    //sprot::Packet_Router r2(&t2);
+    sprot::Packet_Router r1(&t1);
+    sprot::Packet_Router r2(&t2);
 
-    sprot::implementation::Protocol p1(&t1);
-    sprot::implementation::Protocol p2(&t2);
+    sprot::implementation::Protocol p1(&r1);
+    sprot::implementation::Protocol p2(&r2);
 
     unsigned long read_bytes1 = 0;
     unsigned long sent_bytes1 = 0;
