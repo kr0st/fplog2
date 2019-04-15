@@ -45,6 +45,9 @@ void Packet_Router::reader_thread(Packet_Router* p)
                 continue;
             }
 
+            debug_logging::g_logger.log("=== before ===");
+            p->waitlist_trace();
+
             read_ext_data.port = frame.details.origin_listen_port;
 
             Address tuple(read_ext_data);
@@ -133,6 +136,9 @@ void Packet_Router::reader_thread(Packet_Router* p)
                 req->read_ext_data = read_ext_data;
 
                 req->done = true;
+
+                debug_logging::g_logger.log("=== after ===");
+                p->waitlist_trace();
             }
         }
         catch (std::exception&)
@@ -290,6 +296,49 @@ Packet_Router::~Packet_Router()
 {
     stop_reading_ = true;
     reader_.join();
+}
+
+void Packet_Router::waitlist_trace()
+{
+    std::string frame_types[0x13 + 6];
+
+    unsigned i = 0x13;
+    frame_types[i++] = "HS";
+    frame_types[i++] = "GB";
+    frame_types[i++] = "AK";
+    frame_types[i++] = "NA";
+    frame_types[i++] = "DT";
+    frame_types[i++] = "RR";
+
+    char str[255];
+
+    sprintf(str, "Addresses in waitlist: %lu", waitlist_.size());
+    debug_logging::g_logger.log("waitlist_ trace:");
+
+    for (auto it(waitlist_.begin()); it != waitlist_.end(); it++)
+    {
+        sprintf(str, "ip = %x; port = %d; requests total (incl. del): %lu", it->first.ip, it->first.port, it->second.size());
+
+        debug_logging::g_logger.log(str);
+
+        for (auto req(it->second.begin()); req != it->second.end(); req++)
+        {
+            if ((*req) == nullptr)
+            {
+                debug_logging::g_logger.log("deleted request");
+                continue;
+            }
+
+            if ((!(*req)->done) || ((*req)->read_bytes < 2))
+                sprintf(str, "status: %d; length: %lu", (*req)->done, (*req)->read_bytes);
+
+            if ((*req)->done && ((*req)->read_bytes >= 2))
+                sprintf(str, "status: %d; length: %lu; frame type: %s; ip from: %x; port from (listen): %d", (*req)->done, (*req)->read_bytes,
+                        frame_types[*((unsigned short*)&((*req)->read_buffer[2]))].c_str(), (*req)->read_ext_data.ip, (*req)->read_ext_data.port);
+
+            debug_logging::g_logger.log(str);
+        }
+    }
 }
 
 };

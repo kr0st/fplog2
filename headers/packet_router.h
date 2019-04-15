@@ -43,7 +43,9 @@ class Packet_Router: public Extended_Transport_Interface
 
         static void reader_thread(Packet_Router* p);
         bool stop_reading_;
-        std::thread reader_;        
+        std::thread reader_;
+
+        void waitlist_trace();
 };
 
 };
