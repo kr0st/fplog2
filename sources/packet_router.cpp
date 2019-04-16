@@ -59,19 +59,20 @@ void Packet_Router::reader_thread(Packet_Router* p)
                 std::lock_guard lock(p->waitlist_mutex_);
 
                 auto q_iter = p->waitlist_.find(tuple);
+
                 if (q_iter != p->waitlist_.end())
                 {
-                    std::vector<Read_Request*> q(q_iter->second);
-                    if (q.size() == 0)
+                    std::vector<Read_Request*>* q(&q_iter->second);
+                    if (q->size() == 0)
                     {
                         req = new Read_Request();
-                        q.push_back(req);
+                        q->push_back(req);
                     }
                     else
                     {
-                        auto it(q.begin());
+                        auto it(q->begin());
 
-                        for (; it != q.end(); ++it)
+                        for (; it != q->end(); it++)
                         {
                             if ((*it) && !(*it)->done)
                             {
@@ -80,10 +81,10 @@ void Packet_Router::reader_thread(Packet_Router* p)
                             }
                         }
 
-                        if (it == q.end())
+                        if (it == q->end())
                         {
                             req = new Read_Request();
-                            q.push_back(req);
+                            q->push_back(req);
                         }
                     }
                 }
@@ -96,17 +97,17 @@ void Packet_Router::reader_thread(Packet_Router* p)
 
                     if (q_iter != p->waitlist_.end())
                     {
-                        std::vector<Read_Request*> q(q_iter->second);
-                        if (q.size() == 0)
+                        std::vector<Read_Request*>* q(&q_iter->second);
+                        if (q->size() == 0)
                         {
                             req = new Read_Request();
-                            q.push_back(req);
+                            q->push_back(req);
                         }
                         else
                         {
-                            auto it(q.begin());
+                            auto it(q->begin());
 
-                            for (; it != q.end(); ++it)
+                            for (; it != q->end(); ++it)
                             {
                                 if ((*it) && !(*it)->done)
                                 {
@@ -115,10 +116,10 @@ void Packet_Router::reader_thread(Packet_Router* p)
                                 }
                             }
 
-                            if (it == q.end())
+                            if (it == q->end())
                             {
                                 req = new Read_Request();
-                                q.push_back(req);
+                                q->push_back(req);
                             }
                         }
                     }
@@ -207,6 +208,7 @@ Packet_Router::Read_Request Packet_Router::schedule_read(Address& user_data, siz
                         //queue has only deleted requests, clear it completely
                         req = new Read_Request();
                         queue = &res->second;
+                        queue->clear();
                         res->second.push_back(req);
                         req_num = res->second.size() - 1;
                     }
