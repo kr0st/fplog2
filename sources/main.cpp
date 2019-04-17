@@ -425,7 +425,7 @@ TEST(L1_Transport_Test, DISABLED_Smoke_Test)
 }
 
 
-TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -637,7 +637,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
-TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
+TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 

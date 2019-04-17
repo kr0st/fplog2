@@ -45,9 +45,6 @@ void Packet_Router::reader_thread(Packet_Router* p)
                 continue;
             }
 
-            debug_logging::g_logger.log("=== before ===");
-            p->waitlist_trace();
-
             read_ext_data.port = frame.details.origin_listen_port;
 
             Address tuple(read_ext_data);
@@ -57,6 +54,9 @@ void Packet_Router::reader_thread(Packet_Router* p)
                     return;
 
                 std::lock_guard lock(p->waitlist_mutex_);
+
+                debug_logging::g_logger.log("=== before ===");
+                p->waitlist_trace();
 
                 auto q_iter = p->waitlist_.find(tuple);
 
@@ -302,6 +302,9 @@ Packet_Router::~Packet_Router()
 
 void Packet_Router::waitlist_trace()
 {
+    if (!debug_logging::g_logger.enabled())
+        return;
+
     std::string frame_types[0x13 + 6];
 
     unsigned i = 0x13;
