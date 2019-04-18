@@ -17,7 +17,7 @@ class Protocol: public Protocol_Interface
         size_t write(const void* buf, size_t buf_size, size_t timeout = infinite_wait);
 
         virtual bool connect(const Params& local_config, Address remote, size_t timeout = infinite_wait);
-        virtual bool accept(const Params& local_config, Address remote, size_t timeout = infinite_wait);
+        virtual bool accept(const Params& local_config, Address& remote, size_t timeout = infinite_wait);
 
         Protocol(Extended_Transport_Interface* l1_transport): l1_transport_(l1_transport){}
 

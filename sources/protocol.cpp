@@ -324,7 +324,7 @@ bool Protocol::connect(const Params& local_config, Address remote, size_t timeou
     return connected_;
 }
 
-bool Protocol::accept(const Params& local_config, Address remote, size_t timeout)
+bool Protocol::accept(const Params& local_config, Address& remote, size_t timeout)
 {
     std::lock_guard lock(mutex_);
 
@@ -399,6 +399,8 @@ bool Protocol::accept(const Params& local_config, Address remote, size_t timeout
 
     if (!connected_)
         remote_ = remote;
+    else
+        remote = remote_;
 
     return connected_;
 }
