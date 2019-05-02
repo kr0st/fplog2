@@ -530,6 +530,8 @@ TEST(Protocol_Test, Smoke_Test)
     p.second = "26260";
     params.insert(p);
 
+    params["hostname"] = "WORKSTATION-666";
+
     t1.enable(params);
 
     params["port"] = "26261";
@@ -586,6 +588,8 @@ TEST(Protocol_Test, Accept_Unspecified_Connection_Test)
     p.first = "port";
     p.second = "26260";
     params.insert(p);
+
+    params["hostname"] = "WORKSTATION-666";
 
     t1.enable(params);
 
@@ -653,6 +657,8 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
     p.second = "26260";
     params.insert(p);
 
+    params["hostname"] = "WORKSTATION-666";
+
     t1.enable(params);
 
     params["port"] = "26261";
@@ -717,6 +723,8 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
     p.first = "port";
     p.second = "26260";
     params.insert(p);
+
+    params["hostname"] = "WORKSTATION-666";
 
     t1.enable(params);
 

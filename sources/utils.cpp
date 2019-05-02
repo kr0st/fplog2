@@ -269,8 +269,6 @@ bool compare_files(const std::string& filename1, const std::string& filename2)
 
 uint16_t gen_simple_crc16(const uint8_t *data, uint16_t size)
 {
-    //return gen_crc16(data, size);
-
     uint16_t op1 = 0;
     uint16_t op2 = 0;
     uint16_t ops_xor = 0;
