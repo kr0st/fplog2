@@ -74,14 +74,14 @@ static Frame_Logger logger;
 
 void Protocol::trim_storage(std::map<unsigned int, Packed_Buffer>& storage)
 {
-    if (storage.size() >= storage_max_)
+    if (storage.size() >= options.storage_max)
     {
-        if (storage_trim_ >= storage.size())
+        if (options.storage_trim >= storage.size())
             storage.clear();
 
         auto start = storage.begin();
         auto finish = start;
-        for (unsigned int i = 0; i < storage_trim_; i++, finish++);
+        for (unsigned int i = 0; i < options.storage_trim; i++, finish++);
 
         storage.erase(start, finish);
     }
@@ -97,24 +97,26 @@ void Protocol::empty_storage(std::map<unsigned int, Packed_Buffer>& storage)
 void Protocol::put_in_storage(std::map<unsigned int, Packed_Buffer>& storage, unsigned int sequence, const void* buf)
 {
     Packed_Buffer packed;
-    memset(packed.buffer, 0, Max_Frame_Size);
-    memcpy(packed.buffer, buf, Max_Frame_Size);
+    memset(packed.buffer, 0, implementation::options.max_frame_size);
+    memcpy(packed.buffer, buf, implementation::options.max_frame_size);
     storage[sequence] = packed;
 }
 
 void Protocol::take_from_storage(std::map<unsigned int, Packed_Buffer>& storage, unsigned int sequence, void* buf)
 {
-    memset(buf, 0, Max_Frame_Size);
+    memset(buf, 0, implementation::options.max_frame_size);
     auto frame = storage.find(sequence);
     if (frame != storage.end())
-        memcpy(buf, frame->second.buffer, Max_Frame_Size);
+        memcpy(buf, frame->second.buffer, implementation::options.max_frame_size);
 }
 
 bool is_buffer_empty(const void* buffer)
 {
-    char empty[Max_Frame_Size];
-    memset(empty, 0, Max_Frame_Size);
-    if (memcmp(buffer, empty, Max_Frame_Size) == 0)
+    char* empty = new char[implementation::options.max_frame_size];
+    memset(empty, 0, implementation::options.max_frame_size);
+    std::unique_ptr<char> pempty(empty);
+
+    if (memcmp(buffer, empty, implementation::options.max_frame_size) == 0)
         return true;
     else
         return false;
@@ -211,7 +213,7 @@ Frame Protocol::receive_frame(size_t timeout)
 recv_again:
 
     accepted_remote_ = remote_;
-    size_t received_bytes = l1_transport_->read(read_buffer_, Max_Frame_Size, accepted_remote_, timeout);
+    size_t received_bytes = l1_transport_->read(read_buffer_, implementation::options.max_frame_size, accepted_remote_, timeout);
 
     Frame frame;
     memcpy(frame.bytes, read_buffer_, sizeof(frame.bytes));
@@ -233,7 +235,7 @@ recv_again:
 
         if (stored_reads_.find(frame.details.sequence) != stored_reads_.end())
         {
-            if ((frame.details.sequence % no_ack_count_) == 0)
+            if ((frame.details.sequence % options.no_ack_count) == 0)
                 return frame;
 
             goto recv_again;
@@ -285,9 +287,9 @@ bool Protocol::connect(const Params& local_config, Address remote, size_t timeou
         try
         {
             make_frame(Frame_Type::Handshake_Frame);
-            send_frame(op_timeout_);
+            send_frame(options.op_timeout);
 
-            Frame frame(receive_frame(op_timeout_));
+            Frame frame(receive_frame(options.op_timeout));
             if (frame.details.type != Frame_Type::Ack_Frame)
                 return false;
 
@@ -316,7 +318,7 @@ bool Protocol::connect(const Params& local_config, Address remote, size_t timeou
         }
     };
 
-    generic_util::Retryable handshake(send_handshake, max_retries_);
+    generic_util::Retryable handshake(send_handshake, options.max_retries);
 
     connected_ = handshake.run();
     acceptor_ = false;
@@ -355,14 +357,14 @@ bool Protocol::accept(const Params& local_config, Address& remote, size_t timeou
 
         try
         {
-            Frame frame(receive_frame(op_timeout_));
+            Frame frame(receive_frame(options.op_timeout));
             if (frame.details.type != Frame_Type::Handshake_Frame)
                 return false;
 
             remote_ = accepted_remote_;
 
             make_frame(Frame_Type::Ack_Frame);
-            send_frame(op_timeout_);
+            send_frame(options.op_timeout);
 
             empty_storage(stored_writes_);
             empty_storage(stored_reads_);
@@ -393,7 +395,7 @@ bool Protocol::accept(const Params& local_config, Address& remote, size_t timeou
         }
     };
 
-    generic_util::Retryable handshake(recv_handshake, max_retries_);
+    generic_util::Retryable handshake(recv_handshake, options.max_retries);
     connected_ = handshake.run();
     acceptor_ = true;
 
@@ -410,7 +412,7 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
     if (!buf || (buf_size == 0))
         return 0;
 
-    if (buf_size < sprot::implementation::Mtu)
+    if (buf_size < sprot::implementation::options.mtu)
         THROW(fplog::exceptions::Buffer_Overflow);
 
     std::lock_guard lock(mutex_);
@@ -460,12 +462,12 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
 
         try
         {
-            frame = receive_frame(op_timeout_);
+            frame = receive_frame(options.op_timeout);
 
             if (frame.details.type == Frame_Type::Handshake_Frame)
             {
                 make_frame(Frame_Type::Ack_Frame);
-                send_frame(op_timeout_);
+                send_frame(options.op_timeout);
 
                 empty_storage(stored_writes_);
                 empty_storage(stored_reads_);
@@ -474,7 +476,7 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
                 recv_sequence_ = 0;
                 prev_seq_ = UINT32_MAX - 2;
 
-                frame = receive_frame(op_timeout_);
+                frame = receive_frame(options.op_timeout);
             }
 
             if (frame.details.type != Frame_Type::Data_Frame)
@@ -484,13 +486,13 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
                 ((frame.details.sequence == UINT32_MAX) && (recv_sequence_ == 0)))
             {
                 //Correct sequence number, can return with success.
-                if ((frame.details.sequence % this->no_ack_count_) == 0)
+                if ((frame.details.sequence % options.no_ack_count) == 0)
                 {
                     make_frame(Frame_Type::Ack_Frame);
 
                     //sending double ack for increased stability
-                    send_frame(op_timeout_);
-                    send_frame(op_timeout_);
+                    send_frame(options.op_timeout);
+                    send_frame(options.op_timeout);
                 }
 
                 if (prev_seq_ != frame.details.sequence)
@@ -533,7 +535,7 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
 
     try
     {
-        generic_util::Retryable transmission(read_data, max_retries_);
+        generic_util::Retryable transmission(read_data, options.max_retries);
         bool success(transmission.run());
 
         if (success)
@@ -578,7 +580,7 @@ read_again:
 
         try
         {
-            frame = receive_frame(op_timeout_);
+            frame = receive_frame(options.op_timeout);
 
             if (expect_ack)
             {
@@ -597,7 +599,7 @@ read_again:
 
             if (!any_data)
             {
-                if ((max_received_squence % no_ack_count_) == 0)
+                if ((max_received_squence % options.no_ack_count) == 0)
                     return true;
             }
             else
@@ -620,11 +622,11 @@ read_again:
     };
 
     unsigned int read_failures = 0;
-    while ((max_received_squence % no_ack_count_) != 0)
+    while ((max_received_squence % options.no_ack_count) != 0)
     {
         if (!read_data())
             read_failures++;
-        if (read_failures >= max_retries_)
+        if (read_failures >= options.max_retries)
             break;
     }
 
@@ -646,7 +648,7 @@ read_again:
 
     auto send_ack_or_retransmit = [&]() -> bool
     {
-        if (read_failures >= max_retries_)
+        if (read_failures >= options.max_retries)
             return true;
 
         check_time_out(timeout, timer_start);
@@ -658,16 +660,16 @@ read_again:
                 make_frame(Frame_Type::Ack_Frame);
 
                 //sending double ack for increased stability
-                send_frame(op_timeout_);
+                send_frame(options.op_timeout);
             }
             else
                 make_frame(Frame_Type::Retransmit_Frame, rr_count * sizeof(unsigned int), &(missing[rr_from]));
 
-            send_frame(op_timeout_);
+            send_frame(options.op_timeout);
 
             if (!send_ack)
             {
-                Frame ack = receive_frame(op_timeout_);
+                Frame ack = receive_frame(options.op_timeout);
                 if (ack.details.type != Frame_Type::Ack_Frame)
                     return false;
             }
@@ -692,7 +694,7 @@ read_again:
         }
     };
 
-    generic_util::Retryable ack_or_rr(send_ack_or_retransmit, max_retries_);
+    generic_util::Retryable ack_or_rr(send_ack_or_retransmit, options.max_retries);
 
     if (send_ack)
         ack_or_rr.run();
@@ -704,7 +706,7 @@ read_again:
     {
         if (!send_ack)
         {
-            while (rr_count * sizeof(unsigned int) > Mtu)
+            while (rr_count * sizeof(unsigned int) > implementation::options.mtu)
             {
                 if (rr_count == 0)
                     break;
@@ -719,7 +721,7 @@ read_again:
         {
             expect_ack = true;
 
-            generic_util::Retryable receive_missing(read_data, max_retries_);
+            generic_util::Retryable receive_missing(read_data, options.max_retries);
             any_data = true;
 
             for (unsigned i = 0; i < rr_count; ++i)
@@ -783,7 +785,7 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
     if (!buf || (buf_size == 0))
         return 0;
 
-    if (buf_size > sprot::implementation::Mtu)
+    if (buf_size > sprot::implementation::options.mtu)
         THROW(fplog::exceptions::Buffer_Overflow);
 
     std::lock_guard lock(mutex_);
@@ -806,18 +808,18 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
         try
         {
             take_from_storage(stored_writes_, data.details.sequence, write_buffer_);
-            send_frame(op_timeout_);
+            send_frame(options.op_timeout);
 
-            if ((data.details.sequence % this->no_ack_count_) == 0)
+            if ((data.details.sequence % options.no_ack_count) == 0)
             {
-                recv_frame = receive_frame(op_timeout_);
+                recv_frame = receive_frame(options.op_timeout);
 
                 try
                 {
                     //receiving second ACK, it does not matter if one ACK is lost
                     //so if something happens here we still have 1 valid ACK received
                     //and thus could safely ignore exceptions in this case
-                    receive_frame(op_timeout_);
+                    receive_frame(options.op_timeout);
                 }
                 catch (...){}
 
@@ -851,7 +853,7 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
         }
     };
 
-    generic_util::Retryable transmission(send_data, max_retries_);
+    generic_util::Retryable transmission(send_data, options.max_retries);
     bool success = false;
 
     try
@@ -905,6 +907,10 @@ size_t Protocol::write(const void* buf, size_t buf_size, size_t timeout)
 
 bool Protocol::retransmit_response(std::chrono::time_point<std::chrono::system_clock, std::chrono::system_clock::duration> timer_start, size_t timeout)
 {
+    unsigned char* empty_buffer_ = new unsigned char[implementation::options.max_frame_size];
+    memset(empty_buffer_, 0, implementation::options.max_frame_size);
+    std::unique_ptr<unsigned char> pempty(empty_buffer_);
+
 retrans_again:
 
     Frame retransmit(frame_from_buffer(read_buffer_));
@@ -921,9 +927,6 @@ retrans_again:
 
     memcpy(&(resend_frames[0]), read_buffer_ + sizeof(Frame::bytes), retransmit.details.data_len);
 
-    unsigned char empty_buffer_[Max_Frame_Size];
-    memset(empty_buffer_, 0, Max_Frame_Size);
-
     auto send_data = [&]() -> bool
     {
         check_time_out(timeout, timer_start);
@@ -932,26 +935,26 @@ retrans_again:
         {
 
             make_frame(Ack_Frame);
-            send_frame(op_timeout_);
+            send_frame(options.op_timeout);
 
             for (size_t i = 0; i < resend_frames.size(); ++i)
             {
                 take_from_storage(stored_writes_, resend_frames[i], write_buffer_);
-                if (memcmp(write_buffer_, empty_buffer_, Max_Frame_Size) == 0)
+                if (memcmp(write_buffer_, empty_buffer_, implementation::options.max_frame_size) == 0)
                 {
                     connected_ = false;
                     THROW(exceptions::Connection_Broken);
                 }
-                send_frame(op_timeout_);
+                send_frame(options.op_timeout);
             }
 
-            Frame ack_rr(receive_frame(op_timeout_));
+            Frame ack_rr(receive_frame(options.op_timeout));
 
             try
             {
                 //receiving second failsafe ACK
                 //as first one is received successfully any issues here could be ignored
-                receive_frame(op_timeout_);
+                receive_frame(options.op_timeout);
 
             } catch (...){}
 
@@ -986,7 +989,7 @@ retrans_again:
         }
     };
 
-    generic_util::Retryable retransmit_data(send_data, max_retries_);
+    generic_util::Retryable retransmit_data(send_data, options.max_retries);
 
     try
     {

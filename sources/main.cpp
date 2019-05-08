@@ -70,7 +70,8 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
         THROW(fplog::exceptions::Incorrect_Parameter);
 
     unsigned long bytes_written = 0;
-    unsigned char send_buf[sprot::implementation::Max_Frame_Size];
+    unsigned char* send_buf = new unsigned char[sprot::implementation::options.max_frame_size];
+
     FILE* file = fopen(file_name.c_str(), "w");
 
     sprot::Address recipient;
@@ -85,13 +86,13 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
 
             if (!sprot::Extended_Transport_Interface::null_data(fake_origin))
             {
-                fill_buffer_with_frame_and_random_data(send_buf, sprot::implementation::Max_Frame_Size - sizeof(sprot::implementation::Frame::bytes), fake_ip_port.port, fake_ip_port.ip, rng);
-                how_much = (sprot::implementation::Max_Frame_Size < (bytes_to_write - bytes_written)) ? sprot::implementation::Max_Frame_Size : (bytes_to_write - bytes_written);
+                fill_buffer_with_frame_and_random_data(send_buf, static_cast<unsigned short>(sprot::implementation::options.mtu), fake_ip_port.port, fake_ip_port.ip, rng);
+                how_much = (sprot::implementation::options.max_frame_size < (bytes_to_write - bytes_written)) ? sprot::implementation::options.max_frame_size : (bytes_to_write - bytes_written);
             }
             else
             {
-                randomize_buffer(send_buf, sprot::implementation::Mtu, rng);
-                how_much = (sprot::implementation::Mtu < (bytes_to_write - bytes_written)) ? sprot::implementation::Mtu : (bytes_to_write - bytes_written);
+                randomize_buffer(send_buf, sprot::implementation::options.mtu, rng);
+                how_much = (sprot::implementation::options.mtu < (bytes_to_write - bytes_written)) ? sprot::implementation::options.mtu : (bytes_to_write - bytes_written);
             }
 
             unsigned long current_bytes = 0;
@@ -121,12 +122,14 @@ unsigned long write_to_transport(unsigned int bytes_to_write, std::string file_n
         fflush(file);
         fclose(file);
 
+        delete [] send_buf;
         return bytes_written;
     }
 
     fflush(file);
     fclose(file);
 
+    delete [] send_buf;
     return bytes_written;
 }
 
@@ -144,7 +147,7 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
         THROW(fplog::exceptions::Incorrect_Parameter);
 
     unsigned long bytes_read = 0;
-    unsigned char read_buf[sprot::implementation::Max_Frame_Size];
+    unsigned char* read_buf = new unsigned char[sprot::implementation::options.max_frame_size];
 
     FILE* file = fopen(file_name.c_str(), "w");
 
@@ -158,9 +161,9 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
                 current_bytes = 0;
 
             if (extended)
-                current_bytes = extended->read(read_buf, sprot::implementation::Max_Frame_Size, origin, 10000);
+                current_bytes = extended->read(read_buf, sprot::implementation::options.max_frame_size, origin, 10000);
             else
-                current_bytes = basic->read(read_buf, sprot::implementation::Max_Frame_Size, 10000);
+                current_bytes = basic->read(read_buf, sprot::implementation::options.max_frame_size, 10000);
 
             if (current_bytes == 0)
                 THROW(fplog::exceptions::Read_Failed);
@@ -177,12 +180,14 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
         fflush(file);
         fclose(file);
 
+        delete [] read_buf;
         return bytes_read;
     }
 
     fflush(file);
     fclose(file);
 
+    delete [] read_buf;
     return bytes_read;
 }
 
@@ -551,10 +556,12 @@ TEST(Protocol_Test, Smoke_Test)
 
         EXPECT_NO_THROW(p2.accept(params, remote, 5000));
 
-        unsigned char buf[sprot::implementation::Max_Frame_Size];
+        unsigned char* buf = new unsigned char[sprot::implementation::options.max_frame_size];
 
-        EXPECT_NO_THROW(p2.read(buf, sizeof(buf), 5000));
+        EXPECT_NO_THROW(p2.read(buf, sprot::implementation::options.max_frame_size, 5000));
         EXPECT_EQ(strcmp("hello world", reinterpret_cast<char*>(buf)), 0);
+
+        delete [] buf;
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -566,7 +573,7 @@ TEST(Protocol_Test, Smoke_Test)
     params["port"] = "26260";
     EXPECT_NO_THROW(p1.connect(params, remote, 5000));
 
-    unsigned char buf[sprot::implementation::Max_Frame_Size];
+    unsigned char buf[50];
     sprintf(reinterpret_cast<char*>(buf), "hello world");
 
     EXPECT_NO_THROW(p1.write(buf, strlen("hello world") + 1, 5000));
@@ -615,10 +622,12 @@ TEST(Protocol_Test, Accept_Unspecified_Connection_Test)
         EXPECT_EQ(remote.ip, 0x0100007f);
         EXPECT_EQ(remote.port, 26260);
 
-        unsigned char buf[sprot::implementation::Max_Frame_Size];
+        unsigned char* buf = new unsigned char[sprot::implementation::options.max_frame_size];
 
-        EXPECT_NO_THROW(p2.read(buf, sizeof(buf), 5000));
+        EXPECT_NO_THROW(p2.read(buf, sprot::implementation::options.max_frame_size, 5000));
         EXPECT_EQ(strcmp("hello world", reinterpret_cast<char*>(buf)), 0);
+
+        delete []  buf;
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
@@ -630,7 +639,7 @@ TEST(Protocol_Test, Accept_Unspecified_Connection_Test)
     params["port"] = "26260";
     EXPECT_NO_THROW(p1.connect(params, remote, 5000));
 
-    unsigned char buf[sprot::implementation::Max_Frame_Size];
+    unsigned char buf[50];
     sprintf(reinterpret_cast<char*>(buf), "hello world");
 
     EXPECT_NO_THROW(p1.write(buf, strlen("hello world") + 1, 5000));
@@ -769,6 +778,53 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
     reader1.join();
 
     EXPECT_TRUE(generic_util::compare_files("reader1.txt", "writer1.txt"));
+}
+
+TEST(Options_Test, Load_From_Params)
+{
+    sprot::implementation::Options saved(sprot::implementation::options);
+
+    sprot::Params params;
+    sprot::Param p;
+
+    params["max_frame_size"] = "2096";
+    params["no_ack_count"] = "4";
+    params["storage_max"] = "89";
+    params["storage_trim"] = "30";
+    params["op_timeout"] = "200";
+    params["max_retries"] = "10";
+
+    sprot::implementation::options.Load(params);
+
+    EXPECT_EQ(sprot::implementation::options.max_frame_size, 2096);
+    EXPECT_EQ(sprot::implementation::options.mtu, (sprot::implementation::options.max_frame_size - sizeof(sprot::implementation::Frame::bytes)));
+    EXPECT_EQ(sprot::implementation::options.no_ack_count, 4);
+    EXPECT_EQ(sprot::implementation::options.storage_max, 89);
+    EXPECT_EQ(sprot::implementation::options.storage_trim, 30);
+    EXPECT_EQ(sprot::implementation::options.op_timeout, 200);
+    EXPECT_EQ(sprot::implementation::options.max_retries, 10);
+
+    params["mtu"] = "666";
+    sprot::implementation::options.Load(params);
+
+    EXPECT_EQ(sprot::implementation::options.max_frame_size, 2096);
+    //mtu option should have no effect because this value should only be derived from max_frame_size
+    EXPECT_EQ(sprot::implementation::options.mtu, (sprot::implementation::options.max_frame_size - sizeof(sprot::implementation::Frame::bytes)));
+    EXPECT_EQ(sprot::implementation::options.no_ack_count, 4);
+    EXPECT_EQ(sprot::implementation::options.storage_max, 89);
+    EXPECT_EQ(sprot::implementation::options.storage_trim, 30);
+    EXPECT_EQ(sprot::implementation::options.op_timeout, 200);
+    EXPECT_EQ(sprot::implementation::options.max_retries, 10);
+
+    sprot::implementation::options = saved;
+
+    EXPECT_EQ(sprot::implementation::options.max_frame_size, 4096);
+    EXPECT_EQ(sprot::implementation::options.mtu, (sprot::implementation::options.max_frame_size - sizeof(sprot::implementation::Frame::bytes)));
+    EXPECT_EQ(sprot::implementation::options.no_ack_count, 5);
+    EXPECT_EQ(sprot::implementation::options.storage_max, 100);
+    EXPECT_EQ(sprot::implementation::options.storage_trim, 50);
+    EXPECT_EQ(sprot::implementation::options.op_timeout, 500);
+    EXPECT_EQ(sprot::implementation::options.max_retries, 20);
 }
 
 int main(int argc, char **argv)

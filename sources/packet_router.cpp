@@ -1,13 +1,15 @@
 #include "packet_router.h"
 #include <fplog_exceptions.h>
 #include <chrono>
+#include <memory>
 
 namespace sprot
 {
 
 void Packet_Router::reader_thread(Packet_Router* p)
 {
-    unsigned char read_buffer[sprot::implementation::Max_Frame_Size];
+    unsigned char* read_buffer = new unsigned char[implementation::options.max_frame_size];
+    std::unique_ptr<unsigned char> pbuf(read_buffer);
 
     while (!p->stop_reading_)
     {
@@ -29,7 +31,7 @@ void Packet_Router::reader_thread(Packet_Router* p)
 
             if (((frame.details.type == implementation::Frame_Type::Data_Frame) ||
                  (frame.details.type == implementation::Frame_Type::Retransmit_Frame)) &&
-                    (frame.details.data_len > 0) && (frame.details.data_len <= implementation::Mtu))
+                    (frame.details.data_len > 0) && (frame.details.data_len <= implementation::options.mtu))
             {
                 read_bytes += p->l0_transport_->read(&(read_buffer[sizeof(implementation::Frame::bytes)]), frame.details.data_len, read_ext_data, 250);
                 if (read_bytes != (sizeof(implementation::Frame::bytes) + frame.details.data_len))

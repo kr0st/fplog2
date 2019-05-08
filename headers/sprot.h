@@ -265,15 +265,29 @@ namespace implementation
         Unknown_Frame
     };
 
-    const unsigned int Max_Frame_Size = 4096;
-    const unsigned int Mtu = Max_Frame_Size - sizeof(Frame::bytes);
+    struct Options
+    {
+        unsigned int max_frame_size;
+        unsigned int mtu;
+        unsigned int no_ack_count;
+        unsigned int storage_max;
+        unsigned int storage_trim;
+        unsigned int op_timeout;
+        unsigned int max_retries;
+
+        Options();
+
+        void Load(Params params);
+    };
+
+    extern Options options;
 
     inline bool crc_check(void* buffer, size_t sz, unsigned short* expected = nullptr, unsigned short* actual = nullptr)
     {
         if (sz < sizeof(Frame::bytes))
             return false;
 
-        if (sz > Max_Frame_Size)
+        if (sz > options.max_frame_size)
             return false;
 
         Frame frame;
