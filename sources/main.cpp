@@ -832,6 +832,7 @@ int main(int argc, char **argv)
     debug_logging::g_logger.open("fplog2-test-log.txt");
 
     ::testing::InitGoogleTest(&argc, argv);
+
     int res = RUN_ALL_TESTS();
 
     return res;

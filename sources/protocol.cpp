@@ -479,6 +479,12 @@ size_t Protocol::read(void* buf, size_t buf_size, size_t timeout)
                 frame = receive_frame(options.op_timeout);
             }
 
+            if (frame.details.type == Frame_Type::Ack_Frame)
+            {
+                make_frame(Frame_Type::Ack_Frame);
+                send_frame(options.op_timeout);
+            }
+
             if (frame.details.type != Frame_Type::Data_Frame)
                 return false;
 
