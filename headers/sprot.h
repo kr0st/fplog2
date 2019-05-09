@@ -133,16 +133,32 @@ class SPROT_API Session: public Basic_Transport_Interface
     public:
 
         virtual void disconnect();
+
+        Session();
         virtual ~Session();
+
+
+    private:
+
+        class Session_Implementation;
+        Session_Implementation* impl_;
 };
 
 class SPROT_API Session_Manager
 {
     public:
+
         virtual Session* connect(const Params& local_config, const Params& remote, size_t timeout = Session::infinite_wait) = 0;
         virtual Session* accept(const Params& local_config, const Params& remote, size_t timeout = Session::infinite_wait) = 0;
 
+        Session_Manager();
         virtual ~Session_Manager();
+
+
+    private:
+
+        class Session_Manager_Implementation;
+        class Session_Manager_Implementation* impl_;
 };
 
 namespace exceptions

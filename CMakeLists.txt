@@ -15,7 +15,9 @@ add_executable(${PROJECT_NAME} "sources/main.cpp"
 "sources/udp_transport.cpp"
 "sources/packet_router.cpp"
 "sources/protocol.cpp"
-"sources/sprot_default_options.cpp")
+"sources/sprot_default_options.cpp"
+"sources/session_manager.cpp"
+"sources/session.cpp")
 
 target_link_libraries(${PROJECT_NAME} libgtest.a
     pthread)
