@@ -132,9 +132,15 @@ class SPROT_API Session: public Basic_Transport_Interface
 {
     public:
 
+        size_t read(void* buf, size_t buf_size, size_t timeout = infinite_wait);
+        size_t write(const void* buf, size_t buf_size, size_t timeout = infinite_wait);
+
+        bool connect(const Params& local_config, Address remote, size_t timeout = infinite_wait);
+        bool accept(const Params& local_config, Address& remote, size_t timeout = infinite_wait);
+
         virtual void disconnect();
 
-        Session();
+        Session(Extended_Transport_Interface* l1_transport);
         virtual ~Session();
 
 
@@ -148,8 +154,8 @@ class SPROT_API Session_Manager
 {
     public:
 
-        virtual Session* connect(const Params& local_config, const Params& remote, size_t timeout = Session::infinite_wait) = 0;
-        virtual Session* accept(const Params& local_config, const Params& remote, size_t timeout = Session::infinite_wait) = 0;
+        virtual Session* connect(const Params& local_config, const Address& remote, size_t timeout = Session::infinite_wait) = 0;
+        virtual Session* accept(const Params& local_config, const Address& remote, size_t timeout = Session::infinite_wait) = 0;
 
         Session_Manager();
         virtual ~Session_Manager();

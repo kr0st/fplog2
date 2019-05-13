@@ -430,7 +430,7 @@ TEST(L1_Transport_Test, DISABLED_Smoke_Test)
 }
 
 
-TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -520,7 +520,7 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Protocol_Test, Smoke_Test)
+TEST(Protocol_Test, DISABLED_Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -581,7 +581,7 @@ TEST(Protocol_Test, Smoke_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, Accept_Unspecified_Connection_Test)
+TEST(Protocol_Test, DISABLED_Accept_Unspecified_Connection_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -647,7 +647,7 @@ TEST(Protocol_Test, Accept_Unspecified_Connection_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_No_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -714,7 +714,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -778,6 +778,36 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
     reader1.join();
 
     EXPECT_TRUE(generic_util::compare_files("reader1.txt", "writer1.txt"));
+}
+
+TEST(Map_Test, Map_As_Key)
+{
+    sprot::Params params;
+
+    params["max_frame_size"] = "2096";
+    params["no_ack_count"] = "4";
+    params["storage_max"] = "89";
+    params["storage_trim"] = "30";
+    params["op_timeout"] = "200";
+    params["max_retries"] = "10";
+
+    std::map<sprot::Params, int> test_map;
+
+    test_map[params] = 13;
+
+    sprot::Params params2(params);
+
+    params2["op_timeout"] = "300";
+
+    test_map[params2] = 28;
+
+    params["op_timeout"] = "200";
+
+    EXPECT_EQ(test_map[params], 13);
+
+    params["op_timeout"] = "300";
+
+    EXPECT_EQ(test_map[params], 28);
 }
 
 TEST(Options_Test, Load_From_Params)

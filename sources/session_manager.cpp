@@ -11,29 +11,88 @@ class Session_Manager::Session_Manager_Implementation
 
         struct Transport_Tuple
         {
-            Extended_Transport_Interface* l0_transport_;
-            Packet_Router* l1_transport_;
+            Extended_Transport_Interface* l0_transport_ = nullptr;
+            Packet_Router* l1_transport_ = nullptr;
         };
 
         std::map<Params, Transport_Tuple> transports_;
 
+        std::recursive_mutex transports_mutex_;
 
     public:
 
         Session_Manager_Implementation() {}
         ~Session_Manager_Implementation() {}
+
+        Session* connect(const Params& local_config, const Address& remote, size_t timeout);
+        Session* accept(const Params& local_config, const Address& remote, size_t timeout);
 };
 
-
-
-Session* Session_Manager::connect(const Params& local_config, const Params& remote, size_t timeout)
+Session* Session_Manager::Session_Manager_Implementation::connect(const Params& local_config, const Address& remote, size_t timeout)
 {
-    return nullptr;
+    Transport_Tuple tuple;
+
+    {
+        std::lock_guard<std::recursive_mutex> lock(transports_mutex_);
+
+        auto tp(transports_.find(local_config));
+        if (tp != transports_.end())
+            tuple = tp->second;
+        else
+        {
+            //here we can potentially select transports based on params,
+            //meaning not only UDP but maybe COM/USB, however for now only UDP is implemented
+
+            try
+            {
+                Udp_Transport* t = new Udp_Transport();
+                t->enable(local_config);
+
+                tuple.l0_transport_ = t;
+                tuple.l1_transport_ = new Packet_Router(tuple.l0_transport_);
+
+                transports_[local_config] = tuple;
+
+            }
+            catch (...)
+            {
+                //TODO: handle this situation better
+                delete tuple.l0_transport_;
+                delete tuple.l1_transport_;
+                return nullptr;
+            }
+        }
+    }
+
+    Session* s = nullptr;
+
+    try
+    {
+        s = new Session(tuple.l1_transport_);
+        s->connect(local_config, remote, timeout);
+    }
+    catch (...)
+    {
+        delete s;
+        return nullptr;
+    }
+
+    return s;
 }
 
-Session* Session_Manager::accept(const Params& local_config, const Params& remote, size_t timeout)
+Session* Session_Manager::Session_Manager_Implementation::accept(const Params& local_config, const Address& remote, size_t timeout)
 {
-    return nullptr;
+}
+
+
+Session* Session_Manager::connect(const Params& local_config, const Address& remote, size_t timeout)
+{
+    return impl_->connect(local_config, remote, timeout);
+}
+
+Session* Session_Manager::accept(const Params& local_config, const Address& remote, size_t timeout)
+{
+    return impl_->accept(local_config, remote, timeout);
 }
 
 Session_Manager::Session_Manager()
