@@ -857,6 +857,63 @@ TEST(Options_Test, Load_From_Params)
     EXPECT_EQ(sprot::implementation::options.max_retries, 20);
 }
 
+TEST(Sessions_Test, Connect_Accept_Read_Write)
+{
+    sprot::Session_Manager mgr;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    p.first = "chaos";
+    p.second = "0";
+    params.insert(p);
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26260";
+    params.insert(p);
+
+    params["hostname"] = "WORKSTATION-666";
+
+    unsigned long read_bytes1 = 0;
+    unsigned long sent_bytes1 = 0;
+
+    std::thread reader1([&]{
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26260;
+
+        std::unique_ptr<sprot::Session> s1(mgr.accept(params, remote, 15000));
+        read_bytes1 = read_from_transport(1262140, std::string("reader2.txt"), s1.get());
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+    std::thread writer1([&]{
+
+        params["port"] = "26261";
+        params["chaos"] = "0";
+
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26261;
+
+        params["port"] = "26260";
+        std::unique_ptr<sprot::Session> s2(mgr.connect(params, remote, 15000));
+
+        sent_bytes1 = write_to_transport(1262140, std::string("writer2.txt"), &g_rng1, s2.get());
+    });
+
+    writer1.join();
+
+    reader1.join();
+
+    EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
+}
+
 int main(int argc, char **argv)
 {
     debug_logging::g_logger.open("fplog2-test-log.txt");

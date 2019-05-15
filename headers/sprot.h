@@ -128,6 +128,12 @@ class SPROT_API Protocol_Interface: public Basic_Transport_Interface
         virtual bool accept(const Params& local_config, Address& remote, size_t timeout = infinite_wait) = 0;
 };
 
+struct SPROT_API Session_Configuration
+{
+    Params local_config;
+    Address remote;
+};
+
 class SPROT_API Session: public Basic_Transport_Interface
 {
     public:
@@ -135,13 +141,15 @@ class SPROT_API Session: public Basic_Transport_Interface
         size_t read(void* buf, size_t buf_size, size_t timeout = infinite_wait);
         size_t write(const void* buf, size_t buf_size, size_t timeout = infinite_wait);
 
-        bool connect(const Params& local_config, Address remote, size_t timeout = infinite_wait);
+        bool connect(const Params& local_config, const Address& remote, size_t timeout = infinite_wait);
         bool accept(const Params& local_config, Address& remote, size_t timeout = infinite_wait);
 
         virtual void disconnect();
 
         Session(Extended_Transport_Interface* l1_transport);
         virtual ~Session();
+
+        Session_Configuration get_config();
 
 
     private:
@@ -154,8 +162,8 @@ class SPROT_API Session_Manager
 {
     public:
 
-        virtual Session* connect(const Params& local_config, const Address& remote, size_t timeout = Session::infinite_wait) = 0;
-        virtual Session* accept(const Params& local_config, const Address& remote, size_t timeout = Session::infinite_wait) = 0;
+        virtual Session* connect(const Params& local_config, const Address& remote, size_t timeout = Session::infinite_wait);
+        virtual Session* accept(const Params& local_config, Address& remote, size_t timeout = Session::infinite_wait);
 
         Session_Manager();
         virtual ~Session_Manager();
