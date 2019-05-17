@@ -884,7 +884,7 @@ TEST(Sessions_Test, Connect_Accept_Read_Write)
     std::thread reader1([&]{
         sprot::Address remote;
         remote.ip = 0x0100007f;
-        remote.port = 26260;
+        remote.port = 26261;
 
         std::unique_ptr<sprot::Session> s1(mgr.accept(params, remote, 15000));
         read_bytes1 = read_from_transport(1262140, std::string("reader2.txt"), s1.get());
@@ -899,9 +899,8 @@ TEST(Sessions_Test, Connect_Accept_Read_Write)
 
         sprot::Address remote;
         remote.ip = 0x0100007f;
-        remote.port = 26261;
+        remote.port = 26260;
 
-        params["port"] = "26260";
         std::unique_ptr<sprot::Session> s2(mgr.connect(params, remote, 15000));
 
         sent_bytes1 = write_to_transport(1262140, std::string("writer2.txt"), &g_rng1, s2.get());
