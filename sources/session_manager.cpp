@@ -27,7 +27,16 @@ class Session_Manager::Session_Manager_Implementation
     public:
 
         Session_Manager_Implementation() {}
-        ~Session_Manager_Implementation() {}
+        ~Session_Manager_Implementation()
+        {
+            std::lock_guard lock(transports_mutex_);
+
+            for (auto transport : transports_)
+            {
+                delete transport.second.l1_transport_;
+                delete transport.second.l0_transport_;
+            }
+        }
 
         Session* connect(const Params& local_config, const Address& remote, size_t timeout);
         Session* accept(const Params& local_config, Address& remote, size_t timeout);

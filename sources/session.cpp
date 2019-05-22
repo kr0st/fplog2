@@ -10,6 +10,7 @@ class Session::Session_Implementation
 
         implementation::Protocol* proto_ = nullptr;
         unsigned char multipart_magic_sequence_[13];
+        unsigned char remembered_magic_[sizeof(multipart_magic_sequence_) + sizeof(size_t)];
 
 
     public:
@@ -31,6 +32,8 @@ bool Session::Session_Implementation::connect(const Params& local_config, const 
     if (proto_ == nullptr)
         return 0;
 
+    memset(remembered_magic_, 0, sizeof(remembered_magic_));
+
     return proto_->connect(local_config, remote, timeout);
 }
 
@@ -38,6 +41,8 @@ bool Session::Session_Implementation::accept(const Params& local_config, Address
 {
     if (proto_ == nullptr)
         return 0;
+
+    memset(remembered_magic_, 0, sizeof(remembered_magic_));
 
     return proto_->accept(local_config, remote, timeout);
 }
@@ -47,7 +52,47 @@ size_t Session::Session_Implementation::read(void* buf, size_t buf_size, size_t 
     if (proto_ == nullptr)
         return 0;
 
-    return proto_->read(buf,  buf_size, timeout);
+    size_t bytes_read = 0;
+
+    unsigned char empty_magic[sizeof(remembered_magic_)] = {0};
+    if (memcmp(remembered_magic_, empty_magic, sizeof(remembered_magic_)) == 0)
+        bytes_read = proto_->read(buf,  buf_size, timeout);
+    else
+    {
+        bytes_read = sizeof(remembered_magic_);
+        memcpy(buf, remembered_magic_, sizeof(remembered_magic_));
+    }
+
+    if ((bytes_read == (sizeof(multipart_magic_sequence_) + sizeof(size_t))) &&
+            (memcmp(buf, multipart_magic_sequence_, sizeof(multipart_magic_sequence_)) == 0))
+    {
+        memcpy(remembered_magic_, buf, sizeof(remembered_magic_));
+        size_t expected_len = 0;
+        memcpy(&expected_len, static_cast<unsigned char*>(buf) + sizeof(multipart_magic_sequence_), sizeof(size_t));
+        if (buf_size < expected_len)
+            THROW2(fplog::exceptions::Buffer_Overflow, "Buffer too small! Use get_required_size() from this exception to find fitting size.", expected_len);
+
+        memset(remembered_magic_, 0, sizeof(remembered_magic_));
+
+        int bytes_left = static_cast<int>(expected_len);
+        std::unique_ptr<unsigned char[]> temp_buf(new unsigned char[implementation::options.mtu]);
+
+        unsigned char* buf_ptr = static_cast<unsigned char*>(buf);
+        while (bytes_left > 0)
+        {
+            bytes_read = proto_->read(temp_buf.get(),  implementation::options.mtu, timeout);
+            memcpy(buf_ptr, temp_buf.get(), bytes_read);
+            buf_ptr += bytes_read;
+            bytes_left -= bytes_read;
+        }
+
+        if (bytes_left == 0)
+            return expected_len;
+        else
+            THROW1(fplog::exceptions::Read_Failed, "Corrupted multi-part message!");
+    }
+    else
+        return bytes_read;
 }
 
 size_t Session::Session_Implementation::write(const void* buf, size_t buf_size, size_t timeout)
@@ -59,14 +104,12 @@ size_t Session::Session_Implementation::write(const void* buf, size_t buf_size, 
     {
         size_t timeout_div = buf_size / sprot::implementation::options.mtu + 2;
 
-        unsigned char magic[sizeof(multipart_magic_sequence_) + sizeof(unsigned short)];
+        unsigned char magic[sizeof(multipart_magic_sequence_) + sizeof(size_t)];
         memcpy(magic, multipart_magic_sequence_, sizeof(multipart_magic_sequence_));
+        memcpy(magic + sizeof(multipart_magic_sequence_), &buf_size, sizeof(size_t));
 
-        unsigned short short_size = static_cast<unsigned short>(buf_size);
-        memcpy(magic + sizeof(multipart_magic_sequence_), &short_size, sizeof(unsigned short));
-
-        if ((sizeof(multipart_magic_sequence_) + sizeof(unsigned short)) !=
-                proto_->write(magic, sizeof(multipart_magic_sequence_) + sizeof(unsigned short), timeout / timeout_div))
+        if ((sizeof(multipart_magic_sequence_) + sizeof(size_t)) !=
+                proto_->write(magic, sizeof(multipart_magic_sequence_) + sizeof(size_t), timeout / timeout_div))
             THROW(fplog::exceptions::Write_Failed);
 
         unsigned long bytes_written = 0;
@@ -78,7 +121,7 @@ size_t Session::Session_Implementation::write(const void* buf, size_t buf_size, 
             (sprot::implementation::options.mtu < (bytes_to_write - bytes_written)) ?
                         sprot::implementation::options.mtu : (bytes_to_write - bytes_written);
 
-            unsigned long current_bytes = proto_->write(static_cast<const char*>(buf) + bytes_written, bytes_to_write, timeout / timeout_div);
+            unsigned long current_bytes = proto_->write(static_cast<const char*>(buf) + bytes_written, how_much, timeout / timeout_div);
 
             if (current_bytes != how_much)
                 THROW(fplog::exceptions::Write_Failed);

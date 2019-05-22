@@ -913,6 +913,92 @@ TEST(Sessions_Test, Connect_Accept_Read_Write)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
+TEST(Sessions_Test, Large_Transfer)
+{
+    sprot::Session_Manager mgr;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    p.first = "chaos";
+    p.second = "0";
+    params.insert(p);
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26260";
+    params.insert(p);
+
+    params["hostname"] = "WORKSTATION-666";
+
+    unsigned long read_bytes1 = 0;
+    unsigned long sent_bytes1 = 0;
+
+    const size_t _5mb = 5 * 1024 * 1024;
+    std::unique_ptr<unsigned char[]> random_5mb(new unsigned char[_5mb]);
+
+    std::thread reader1([&]{
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26261;
+
+        bool caught_exception = false;
+
+        std::shared_ptr<sprot::Session> s1(mgr.accept(params, remote, 15000));
+
+        try
+        {
+            std::unique_ptr<unsigned char[]> read_data(new unsigned char[_5mb]);
+            read_bytes1 = s1->read(read_data.get(), _5mb/2, 15000);
+        }
+        catch(fplog::exceptions::Buffer_Overflow& e)
+        {
+            caught_exception = true;
+            EXPECT_EQ(_5mb, e.get_required_size());
+        }
+
+        EXPECT_EQ(caught_exception, true);
+
+        std::unique_ptr<unsigned char[]> read_data(new unsigned char[_5mb]);
+        read_bytes1 = s1->read(read_data.get(), _5mb, 15000);
+
+        FILE* file = fopen("reader3.txt", "w");
+        fwrite(read_data.get(), read_bytes1, 1, file);
+        fclose(file);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+    std::thread writer1([&]{
+
+        params["port"] = "26261";
+        params["chaos"] = "0";
+
+        sprot::Address remote;
+        remote.ip = 0x0100007f;
+        remote.port = 26260;
+
+        std::unique_ptr<sprot::Session> s2(mgr.connect(params, remote, 15000));
+
+        std::unique_ptr<unsigned char[]> random_5mb(new unsigned char[_5mb]);
+        randomize_buffer(random_5mb.get(), _5mb, &g_rng1);
+        sent_bytes1 = s2->write(random_5mb.get(), _5mb, 15000);
+
+        FILE* file = fopen("writer3.txt", "w");
+        fwrite(random_5mb.get(), _5mb, 1, file);
+        fclose(file);
+    });
+
+    writer1.join();
+
+    reader1.join();
+
+    EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
+}
+
 int main(int argc, char **argv)
 {
     debug_logging::g_logger.open("fplog2-test-log.txt");
