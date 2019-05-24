@@ -124,7 +124,7 @@ class SPROT_API Protocol_Interface: public Basic_Transport_Interface
 {
     public:
 
-        virtual bool connect(const Params& local_config, Address remote, size_t timeout = infinite_wait) = 0;
+        virtual bool connect(const Params& local_config, const Address& remote, size_t timeout = infinite_wait) = 0;
         virtual bool accept(const Params& local_config, Address& remote, size_t timeout = infinite_wait) = 0;
 };
 
@@ -134,7 +134,7 @@ struct SPROT_API Session_Configuration
     Address remote;
 };
 
-class SPROT_API Session: public Basic_Transport_Interface
+class SPROT_API Session: public Protocol_Interface
 {
     public:
 

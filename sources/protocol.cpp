@@ -255,7 +255,7 @@ recv_again:
     return frame;
 }
 
-bool Protocol::connect(const Params& local_config, Address remote, size_t timeout)
+bool Protocol::connect(const Params& local_config, const Address& remote, size_t timeout)
 {
     std::lock_guard lock(mutex_);
 

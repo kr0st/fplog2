@@ -920,9 +920,9 @@ TEST(Sessions_Test, Large_Transfer)
     sprot::Params params;
     sprot::Param p;
 
-    p.first = "chaos";
-    p.second = "0";
-    params.insert(p);
+    //configuring local transport for session s1
+    //we will open UDP socket on 127.0.0.1 and port 26260
+    //it will be used both for accepting connections and reading/writing data
 
     p.first = "ip";
     p.second = "127.0.0.1";
@@ -937,34 +937,39 @@ TEST(Sessions_Test, Large_Transfer)
     unsigned long read_bytes1 = 0;
     unsigned long sent_bytes1 = 0;
 
+    //will be sending and receiveing 5 megs of randomized data
     const size_t _5mb = 5 * 1024 * 1024;
-    std::unique_ptr<unsigned char[]> random_5mb(new unsigned char[_5mb]);
 
+    //launching accept connection and receiving data in a separate thread
     std::thread reader1([&]{
         sprot::Address remote;
-        remote.ip = 0x0100007f;
-        remote.port = 26261;
+        remote.ip = 0x0100007f; //accepting connection only from IP = 127.0.0.1
+        remote.port = 26261; //and port = 26261 combination
 
         bool caught_exception = false;
+        std::unique_ptr<unsigned char[]> read_data(new unsigned char[_5mb]);
 
         std::shared_ptr<sprot::Session> s1(mgr.accept(params, remote, 15000));
 
         try
         {
-            std::unique_ptr<unsigned char[]> read_data(new unsigned char[_5mb]);
+            //here we expect the exception because we provided buffer that is too small
             read_bytes1 = s1->read(read_data.get(), _5mb/2, 15000);
         }
         catch(fplog::exceptions::Buffer_Overflow& e)
         {
             caught_exception = true;
+            //catch exception and check that it provided us with the buffer size that will fit all data
             EXPECT_EQ(_5mb, e.get_required_size());
         }
 
         EXPECT_EQ(caught_exception, true);
 
-        std::unique_ptr<unsigned char[]> read_data(new unsigned char[_5mb]);
+        //reading these 5 megs again with properly sized buffer
         read_bytes1 = s1->read(read_data.get(), _5mb, 15000);
 
+        //storing received data to file in order to compare and check for inconsistencies
+        //with the data that has been sent, obviously these two should be identical
         FILE* file = fopen("reader3.txt", "w");
         fwrite(read_data.get(), read_bytes1, 1, file);
         fclose(file);
@@ -972,30 +977,39 @@ TEST(Sessions_Test, Large_Transfer)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
+    //launching connect and sending data in a separate thread
     std::thread writer1([&]{
 
-        params["port"] = "26261";
-        params["chaos"] = "0";
+        params["port"] = "26261"; //this is the local port of the sending socket for session s2
+        //when a session is created, it is associated with a local socket
+        //that is being created at the same time with the session or reused if
+        //there already is a socket of the same IP/Port combination inside
+        //the Session_Manager internals
 
         sprot::Address remote;
-        remote.ip = 0x0100007f;
-        remote.port = 26260;
+        remote.ip = 0x0100007f;//connecting to IP = 127.0.0.1
+        remote.port = 26260;//on port = 26260
 
+        //connecting to the session s1 that is already listening and waiting to accept connection
         std::unique_ptr<sprot::Session> s2(mgr.connect(params, remote, 15000));
 
         std::unique_ptr<unsigned char[]> random_5mb(new unsigned char[_5mb]);
         randomize_buffer(random_5mb.get(), _5mb, &g_rng1);
+
+        //sending random 5 megs to session s1
         sent_bytes1 = s2->write(random_5mb.get(), _5mb, 15000);
 
+        //storing sent data to file to compare later with the data that was received
+        //in case there were no errors both should match
         FILE* file = fopen("writer3.txt", "w");
         fwrite(random_5mb.get(), _5mb, 1, file);
         fclose(file);
     });
 
     writer1.join();
-
     reader1.join();
 
+    //checking if sent data matches received data, there should be no differences
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
