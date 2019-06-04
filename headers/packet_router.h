@@ -57,9 +57,14 @@ class Packet_Router: public Extended_Transport_Interface
 
         Read_Request schedule_read(Address& user_data, size_t timeout = infinite_wait);
 
+
+        static void waste_management_thread(Packet_Router* p);
         static void reader_thread(Packet_Router* p);
+
         bool stop_reading_;
+
         std::thread reader_;
+        std::thread garbage_collector_;
 
         void waitlist_trace();
 };

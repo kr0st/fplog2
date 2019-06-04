@@ -5,13 +5,16 @@ namespace implementation {
 
 Options::Options()
 {
-    max_frame_size = 4096;
-    mtu = max_frame_size - sizeof(Frame::bytes);
-    no_ack_count = 5;
-    storage_max = 100;
-    storage_trim = 50;
-    op_timeout = 500;
-    max_retries = 20;
+    max_frame_size = 4096; //maximum size of a single protocol frame
+    mtu = max_frame_size - sizeof(Frame::bytes); //the largest payload that could be transfered in a single frame
+    no_ack_count = 5; //how many DATA frames could be sent before ACK is requested
+    storage_max = 100;//how many received frames could be temporarily stored
+                      //to ensure error correction (retransmit) will work if needed
+    storage_trim = 50;//how many frames to delete from temporary storage if storage_max is reached
+    op_timeout = 500; //a single operation timeout, should be considerably less than the whole read/write user timeout
+    max_retries = 20; //maximum number of retries of the unsuccessful operation
+    max_connections = 1024;    //maximum number of pending and established connections
+    max_requests_in_queue = 21;//maximum number of pending requests per established or pending connection
 }
 
 void Options::Load(Params params)

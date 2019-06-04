@@ -714,7 +714,7 @@ TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_No_Simulated_Errors)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
-TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
+TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -812,10 +812,10 @@ TEST(Map_Test, Map_As_Key)
 
 TEST(Options_Test, Load_From_Params)
 {
+    //storing current options
     sprot::implementation::Options saved(sprot::implementation::options);
 
     sprot::Params params;
-    sprot::Param p;
 
     params["max_frame_size"] = "2096";
     params["no_ack_count"] = "4";

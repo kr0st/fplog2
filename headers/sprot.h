@@ -297,13 +297,16 @@ namespace implementation
 
     struct Options
     {
-        unsigned int max_frame_size;
-        unsigned int mtu;
-        unsigned int no_ack_count;
-        unsigned int storage_max;
-        unsigned int storage_trim;
-        unsigned int op_timeout;
-        unsigned int max_retries;
+        unsigned int max_frame_size; //maximum size of a single protocol frame
+        unsigned int mtu;            //maximum transfer unit - the largest payload that could be transfered in a single frame
+        unsigned int no_ack_count;   //how many DATA frames could be sent before ACK is requested
+        unsigned int storage_max;    //how many received frames could be temporarily stored
+                                     //to ensure error correction (retransmit) will work if needed
+        unsigned int storage_trim;   //how many frames to delete from temporary storage if storage_max is reached
+        unsigned int op_timeout;     //a single operation timeout, should be considerably less than the whole read/write user timeout
+        unsigned int max_retries;    //maximum number of retries of the unsuccessful operation
+        unsigned int max_connections;//maximum number of pending and established connections
+        unsigned int max_requests_in_queue;//maximum number of pending requests per established or pending connection
 
         Options();
 

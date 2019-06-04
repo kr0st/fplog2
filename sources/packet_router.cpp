@@ -6,6 +6,77 @@
 namespace sprot
 {
 
+void Packet_Router::waste_management_thread(Packet_Router* p)
+{
+    while (!p->stop_reading_)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
+        {
+            std::lock_guard lock(p->waitlist_mutex_);
+
+            debug_logging::g_logger.log("=== before GC cycle ===");
+            p->waitlist_trace();
+
+            auto q_iter = p->waitlist_.begin();
+
+            unsigned int connections = 0;
+            while (q_iter != p->waitlist_.end())
+            {
+                if (q_iter->second.empty())
+                {
+                    p->waitlist_.erase(q_iter);
+                    q_iter = p->waitlist_.begin();
+                }
+                else
+                {
+                    connections++;
+
+                    unsigned int requests = 0;
+
+                    auto q = q_iter->second;
+                    auto req_iter = q.begin();
+
+                    //dumb, fast and easy approach - just cut N latest requests that are over max_requests option
+                    //could be updated to something smarter if needed
+                    while (req_iter != q.end())
+                    {
+                        requests++;
+                        if (requests > sprot::implementation::options.max_requests_in_queue)
+                        {
+                            delete *req_iter;
+                            q.erase(req_iter);
+                            req_iter = q.begin();
+                            requests--;
+                        }
+                        else
+                            req_iter++;
+                    }
+
+                    q_iter++;
+                }
+            }
+
+            //now this is super dumb and easy - if too many connections - just delete everything and let
+            //error correction mechanism (timeouts/retries) to kick in and restore useful active connections
+            if (connections > sprot::implementation::options.max_connections)
+            {
+                for (auto it = p->waitlist_.begin(); it != p->waitlist_.end(); ++it)
+                    for (auto jit = it->second.begin(); jit != it->second.end(); ++jit)
+                        delete *jit;
+
+                {
+                    std::map<Address, std::vector<Read_Request*>> empty;
+                    p->waitlist_.swap(empty);
+                }
+            }
+        }
+
+        debug_logging::g_logger.log("=== after GC cycle ===");
+        p->waitlist_trace();
+    }
+}
+
 void Packet_Router::reader_thread(Packet_Router* p)
 {
     unsigned char* read_buffer = new unsigned char[implementation::options.max_frame_size];
@@ -34,17 +105,26 @@ void Packet_Router::reader_thread(Packet_Router* p)
                     (frame.details.data_len > 0) && (frame.details.data_len <= implementation::options.mtu))
             {
                 read_bytes += p->l0_transport_->read(&(read_buffer[sizeof(implementation::Frame::bytes)]), frame.details.data_len, read_ext_data, 250);
+
                 if (read_bytes != (sizeof(implementation::Frame::bytes) + frame.details.data_len))
                 {
                     debug_logging::g_logger.log("read_bytes != (sizeof(implementation::Frame::bytes) + frame.details.data_len)\n");
                     continue;
                 }
-            }
 
-            if (!implementation::crc_check(read_buffer, read_bytes))
+                if (!implementation::crc_check(read_buffer, read_bytes))
+                {
+                    debug_logging::g_logger.log("!implementation::crc_check(read_buffer, read_bytes)\n");
+                    continue;
+                }
+            }
+            else
             {
-                debug_logging::g_logger.log("!implementation::crc_check(read_buffer, read_bytes)\n");
-                continue;
+                if (!implementation::crc_check(read_buffer, read_bytes))
+                {
+                    debug_logging::g_logger.log("!implementation::crc_check(read_buffer, read_bytes)\n");
+                    continue;
+                }
             }
 
             read_ext_data.port = frame.details.origin_listen_port;
@@ -57,8 +137,8 @@ void Packet_Router::reader_thread(Packet_Router* p)
 
                 std::lock_guard lock(p->waitlist_mutex_);
 
-                debug_logging::g_logger.log("=== before ===");
-                p->waitlist_trace();
+                //debug_logging::g_logger.log("=== before ===");
+                //p->waitlist_trace();
 
                 auto q_iter = p->waitlist_.find(tuple);
 
@@ -140,8 +220,8 @@ void Packet_Router::reader_thread(Packet_Router* p)
 
                 req->done = true;
 
-                debug_logging::g_logger.log("=== after ===");
-                p->waitlist_trace();
+                //debug_logging::g_logger.log("=== after ===");
+                //p->waitlist_trace();
             }
         }
         catch (std::exception&)
@@ -158,7 +238,8 @@ void Packet_Router::reader_thread(Packet_Router* p)
 Packet_Router::Packet_Router(Extended_Transport_Interface* l0_transport):
 l0_transport_(l0_transport),
 stop_reading_(false),
-reader_(std::bind(Packet_Router::reader_thread, this))
+reader_(std::bind(Packet_Router::reader_thread, this)),
+garbage_collector_(std::bind(Packet_Router::waste_management_thread, this))
 {
 }
 
@@ -300,6 +381,7 @@ Packet_Router::~Packet_Router()
 {
     stop_reading_ = true;
     reader_.join();
+    garbage_collector_.join();
 }
 
 void Packet_Router::waitlist_trace()
