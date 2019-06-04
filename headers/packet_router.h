@@ -54,6 +54,8 @@ class Packet_Router: public Extended_Transport_Interface
 
         std::map<Address, std::vector<Read_Request*>> waitlist_;
         std::mutex waitlist_mutex_;
+        static std::mutex waitlist_trace_mutex_;
+
 
         Read_Request schedule_read(Address& user_data, size_t timeout = infinite_wait);
 

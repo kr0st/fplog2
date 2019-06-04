@@ -6,6 +6,8 @@
 namespace sprot
 {
 
+std::mutex Packet_Router::waitlist_trace_mutex_;
+
 void Packet_Router::waste_management_thread(Packet_Router* p)
 {
     while (!p->stop_reading_)
@@ -389,7 +391,9 @@ void Packet_Router::waitlist_trace()
     if (!debug_logging::g_logger.enabled())
         return;
 
-    std::string frame_types[0x13 + 6];
+    std::lock_guard lock(waitlist_trace_mutex_);
+
+    std::string frame_types[0x13 + 7];
 
     unsigned i = 0x13;
     frame_types[i++] = "HS";
@@ -398,6 +402,7 @@ void Packet_Router::waitlist_trace()
     frame_types[i++] = "NA";
     frame_types[i++] = "DT";
     frame_types[i++] = "RR";
+    frame_types[i++] = "??";
 
     char str[255];
 
@@ -422,8 +427,13 @@ void Packet_Router::waitlist_trace()
                 sprintf(str, "status: %d; length: %lu", (*req)->done, (*req)->read_bytes);
 
             if ((*req)->done && ((*req)->read_bytes >= 2))
+            {
+                unsigned short frame_type = *((unsigned short*)&((*req)->read_buffer[2]));
+                if (frame_type >= (0x13 + 6))
+                    frame_type = 0x13 + 6;
                 sprintf(str, "status: %d; length: %lu; frame type: %s; ip from: %x; port from (listen): %d", (*req)->done, (*req)->read_bytes,
-                        frame_types[*((unsigned short*)&((*req)->read_buffer[2]))].c_str(), (*req)->read_ext_data.ip, (*req)->read_ext_data.port);
+                        frame_types[frame_type].c_str(), (*req)->read_ext_data.ip, (*req)->read_ext_data.port);
+            }
 
             debug_logging::g_logger.log(str);
         }
