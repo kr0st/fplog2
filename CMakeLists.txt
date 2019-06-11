@@ -17,6 +17,8 @@ add_executable(${PROJECT_NAME} "sources/main.cpp"
 "sources/protocol.cpp"
 "sources/sprot_default_options.cpp"
 "sources/session_manager.cpp"
+"sources/queue_controller.cpp"
+"sources/fplog.cpp"
 "sources/session.cpp")
 
 target_link_libraries(${PROJECT_NAME} libgtest.a
