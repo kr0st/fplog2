@@ -4,6 +4,7 @@
 #include <set>
 #include <vector>
 #include <rapidjson/rapidjson.h>
+#include <rapidjson/document.h>
 #include <typeinfo>
 #include <sprot.h>
 #include <fplog_exceptions.h>
@@ -148,7 +149,8 @@ class FPLOG_API Message
         };
 
         Message(const char* prio, const char *facility, const char* format = 0, ...);
-        Message(const JSONNode& msg);
+        //Message(const JSONNode& msg);
+        Message(const rapidjson::Value::Object& msg);
         Message(const std::string& msg);
 
         Message& set_timestamp(const char* timestamp = 0); //either sets provided timestamp or uses current system date/time if timestamp is 0
@@ -161,12 +163,12 @@ class FPLOG_API Message
         Message& add_binary(const char* param_name, const void* buf, size_t buf_size_bytes);
 
         //before adding JSON element make sure it has a name
-        Message& add(JSONNode& param);
+        Message& add(const rapidjson::Value::Object& param);
         Message& add(const std::string& json); //here adding json object that is encoded in plaintext string
 
-        Message& add_batch(JSONNode& batch);
+        Message& add_batch(rapidjson::Value::Object& batch);
         bool has_batch();
-        JSONNode get_batch();
+        rapidjson::Value::Object get_batch();
 
         Message& set_text(std::string& text);
         Message& set_text(const char* text);
@@ -184,7 +186,7 @@ class FPLOG_API Message
         Message& set_file(const char* name);
 
         std::string as_string() const;
-        JSONNode& as_json();
+        //JSONNode& as_json();
 
 
     private:
@@ -253,11 +255,11 @@ class FPLOG_API Message
             return valid;
         }
 
-        bool is_valid(JSONNode& param);
+        bool is_valid(rapidjson::Value::Object& param);
 
         template <typename T> Message& add(const char* param_name, T param)
         {
-            std::string trimmed(param_name);
+/*            std::string trimmed(param_name);
             trim(trimmed);
 
             if (param_name && is_valid(trimmed.c_str(), param))
@@ -269,12 +271,12 @@ class FPLOG_API Message
                     msg_.push_back(JSONNode(trimmed.c_str(), param));
             }
 
-            return *this;
+            return *this;*/
         }
         
         Message& set_sequence(unsigned long long int sequence);
 
-        JSONNode msg_;
+        rapidjson::Value::Object msg_;
         bool validate_params_;
 
         static std::vector<std::string> reserved_names_;
@@ -317,50 +319,6 @@ class FPLOG_API Filter_Base
     private:
 
         Filter_Base();
-};
-
-//From within Lua code a special variable will be accessible: fplog_message,
-//this is a log message parsed from JSON and turned into Lua tables hierarchy.
-//All fields contained in the log message are available from Lua.
-//If script decides that fplog_message should pass the filter it should set global var filter_result to true.
-//!!! PERFORMANCE WARNING !!! use only when really advanced log filtering logic is required on client side:
-//this filter is very slow, meaning only around 250 messages per second will be handled.
-class FPLOG_API Lua_Filter: public Filter_Base
-{
-    public:
-
-            Lua_Filter(const char* filter_id, const char* lua_script);
-            virtual bool should_pass(const Message& msg);
-            virtual ~Lua_Filter();
-
-    private:
-
-            Lua_Filter();
-
-            class Lua_Filter_Impl;
-            Lua_Filter_Impl* impl_;
-};
-
-//From within ChaiScript code a special variable will be accessible: fplog_message,
-//this is a log message parsed from JSON.
-//All fields contained in the log message are available from ChaiScript.
-//If script decides that fplog_message should pass the filter it should set global var filter_result to true.
-//!!! PERFORMANCE WARNING !!! use only when really advanced log filtering logic is required on client side:
-//this filter is very slow, meaning only around 520 messages per second will be handled.
-class FPLOG_API Chai_Filter: public Filter_Base
-{
-    public:
-
-            Chai_Filter(const char* filter_id, const char* chai_script);
-            virtual bool should_pass(const Message& msg);
-            virtual ~Chai_Filter();
-
-    private:
-
-            Chai_Filter();
-
-            class Chai_Filter_Impl;
-            Chai_Filter_Impl* impl_;
 };
 
 //You need to explicitly state messages of which priorities you need to log by using add/remove.

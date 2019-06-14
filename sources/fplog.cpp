@@ -7,6 +7,7 @@
 #include <udp_transport.h>
 #include <mutex>
 #include <queue_controller.h>
+#include <rapidjson/allocators.h>
 
 namespace fplog
 {
@@ -52,7 +53,7 @@ const char* Message::Optional_Fields::sequence = "sequence"; //sequence number t
 const char* Message::Optional_Fields::batch = "batch"; //indicator if this message is actually a container for N other shorter messages
 
 Message::Message(const char* prio, const char *facility, const char* format, ...):
-msg_(JSON_NODE)
+msg_(rapidjson::Document().SetObject().GetObject())
 {
     set_timestamp();
     set(Mandatory_Fields::priority, prio ? prio : Prio::debug);
@@ -121,15 +122,15 @@ Message& Message::set_sequence(unsigned long long int sequence)
     return set(Optional_Fields::sequence, sequence);
 }
 
-Message& Message::add(JSONNode& param)
+Message& Message::add(const rapidjson::Value::Object& param)
 {
     if (is_valid(param))
     {
-        JSONNode::iterator it(msg_.find_nocase(param.name()));
+        rapidjson::Value::Object::MemberIterator it(msg_.FindMember(param.begin()->name));
         if (it != msg_.end())
-            *it=param;
+            *it=*param.begin();
         else
-            msg_.push_back(param);
+            msg_.AddMember(param.begin()->name, param.begin()->value, rapidjson::GenericDocument<rapidjson::UTF8<>>().GetAllocator());
     }
 
     return *this;
@@ -137,9 +138,15 @@ Message& Message::add(JSONNode& param)
 
 Message& Message::add(const std::string& json)
 {
-    JSONNode json_object(libjson::parse(json));
-    json_object.set_name("inserted_json");
-    return add(json_object);
+    rapidjson::GenericDocument<rapidjson::UTF8<>> parsed;
+    std::unique_ptr<char[]> to_parse(new char[json.size() + 1]);
+    parsed.ParseInsitu(to_parse.get());
+
+    rapidjson::Value inserted_json;
+    inserted_json.AddMember("inserted_json", parsed.GetObject(), rapidjson::Document().GetAllocator());
+
+    const rapidjson::Value::Object& obj = inserted_json.GetObject();
+    return add(obj);
 }
 
 Message& Message::add_batch(JSONNode& batch)
