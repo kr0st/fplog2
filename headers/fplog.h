@@ -149,9 +149,20 @@ class FPLOG_API Message
         };
 
         Message(const char* prio, const char *facility, const char* format = 0, ...);
-        //Message(const JSONNode& msg);
-        Message(const rapidjson::Value::Object& msg);
+        Message(const rapidjson::Document& msg);
         Message(const std::string& msg);
+
+        Message(const Message &obj)
+        {
+            validate_params_ = obj.validate_params_;
+            msg_.CopyFrom(obj.msg_, msg_.GetAllocator());
+        }
+        Message& operator= (const Message& rhs)
+        {
+            validate_params_ = rhs.validate_params_;
+            msg_.CopyFrom(rhs.msg_, msg_.GetAllocator());
+            return *this;
+        }
 
         Message& set_timestamp(const char* timestamp = 0); //either sets provided timestamp or uses current system date/time if timestamp is 0
 
@@ -163,12 +174,12 @@ class FPLOG_API Message
         Message& add_binary(const char* param_name, const void* buf, size_t buf_size_bytes);
 
         //before adding JSON element make sure it has a name
-        Message& add(const rapidjson::Value::Object& param);
+        Message& add(rapidjson::Document& param);
         Message& add(const std::string& json); //here adding json object that is encoded in plaintext string
 
-        Message& add_batch(rapidjson::Value::Object& batch);
+        Message& add_batch(rapidjson::Document& batch);
         bool has_batch();
-        rapidjson::Value::Object get_batch();
+        rapidjson::Document get_batch();
 
         Message& set_text(std::string& text);
         Message& set_text(const char* text);
@@ -186,7 +197,7 @@ class FPLOG_API Message
         Message& set_file(const char* name);
 
         std::string as_string() const;
-        //JSONNode& as_json();
+        rapidjson::Document& as_json();
 
 
     private:
@@ -255,28 +266,30 @@ class FPLOG_API Message
             return valid;
         }
 
-        bool is_valid(rapidjson::Value::Object& param);
+        bool is_valid(const rapidjson::Document& param);
 
         template <typename T> Message& add(const char* param_name, T param)
         {
-/*            std::string trimmed(param_name);
+            std::string trimmed(param_name);
             trim(trimmed);
+
+            rapidjson::GenericValue<T> v(param);
 
             if (param_name && is_valid(trimmed.c_str(), param))
             {
-                JSONNode::iterator it(msg_.find_nocase(param_name));
-                if (it != msg_.end())
-                    *it = param;
+                auto it(msg_.FindMember(trimmed.c_str()));
+                if (it == msg_.MemberEnd())
+                    msg_.AddMember(trimmed.c_str(), v, msg_.GetAllocator());
                 else
-                    msg_.push_back(JSONNode(trimmed.c_str(), param));
+                    *it = v;
             }
 
-            return *this;*/
+            return *this;
         }
         
         Message& set_sequence(unsigned long long int sequence);
 
-        rapidjson::Value::Object msg_;
+        rapidjson::Document msg_;
         bool validate_params_;
 
         static std::vector<std::string> reserved_names_;

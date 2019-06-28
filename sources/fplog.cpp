@@ -8,6 +8,7 @@
 #include <mutex>
 #include <queue_controller.h>
 #include <rapidjson/allocators.h>
+#include <rapidjson/writer.h>
 
 namespace fplog
 {
@@ -53,7 +54,7 @@ const char* Message::Optional_Fields::sequence = "sequence"; //sequence number t
 const char* Message::Optional_Fields::batch = "batch"; //indicator if this message is actually a container for N other shorter messages
 
 Message::Message(const char* prio, const char *facility, const char* format, ...):
-msg_(rapidjson::Document().SetObject().GetObject())
+msg_()
 {
     set_timestamp();
     set(Mandatory_Fields::priority, prio ? prio : Prio::debug);
@@ -122,15 +123,15 @@ Message& Message::set_sequence(unsigned long long int sequence)
     return set(Optional_Fields::sequence, sequence);
 }
 
-Message& Message::add(const rapidjson::Value::Object& param)
+Message& Message::add(rapidjson::Document& param)
 {
     if (is_valid(param))
     {
-        rapidjson::Value::Object::MemberIterator it(msg_.FindMember(param.begin()->name));
-        if (it != msg_.end())
-            *it=*param.begin();
+        auto it(msg_.FindMember(param.MemberBegin()->name));
+        if (it != msg_.MemberEnd())
+            it->value.CopyFrom(param.MemberBegin()->value, msg_.GetAllocator());
         else
-            msg_.AddMember(param.begin()->name, param.begin()->value, rapidjson::GenericDocument<rapidjson::UTF8<>>().GetAllocator());
+            msg_.AddMember(param.MemberBegin()->name, param.MemberBegin()->value, msg_.GetAllocator());
     }
 
     return *this;
@@ -142,16 +143,18 @@ Message& Message::add(const std::string& json)
     std::unique_ptr<char[]> to_parse(new char[json.size() + 1]);
     parsed.ParseInsitu(to_parse.get());
 
-    rapidjson::Value inserted_json;
-    inserted_json.AddMember("inserted_json", parsed.GetObject(), rapidjson::Document().GetAllocator());
-
-    const rapidjson::Value::Object& obj = inserted_json.GetObject();
-    return add(obj);
+    return add(parsed);
 }
 
-Message& Message::add_batch(JSONNode& batch)
+Message& Message::add_batch(rapidjson::Document& batch)
 {
-    batch.set_name(Message::Optional_Fields::batch);
+    auto it(batch.MemberBegin());
+
+    if ((it == batch.MemberEnd()) || !it->value.IsArray())
+        THROW(fplog::exceptions::Incorrect_Parameter);
+
+    it->name.SetString(fplog::Message::Optional_Fields::batch, static_cast<unsigned int>(strlen(fplog::Message::Optional_Fields::batch)));
+
     validate_params_ = false;
 
     try
@@ -176,38 +179,37 @@ Message& Message::add_batch(JSONNode& batch)
 
 bool Message::has_batch()
 {
-    try
+    for (auto it(msg_.MemberBegin()); it != msg_.MemberEnd(); ++it)
     {
-        JSONNode::iterator it(msg_.find(fplog::Message::Optional_Fields::batch));
-
-        if (it != msg_.end())
+        if (it->value.IsArray() && (strcmp(it->name.GetString(), fplog::Message::Optional_Fields::batch)) == 0)
             return true;
-    }
-    catch(...)
-    {
     }
 
     return false;
 }
 
-JSONNode Message::get_batch()
+rapidjson::Document Message::get_batch()
 {
-    JSONNode::iterator it(msg_.find(fplog::Message::Optional_Fields::batch));
+    auto it(msg_.FindMember(fplog::Message::Optional_Fields::batch));
 
-    if (it != msg_.end())
-        return *it;
+    rapidjson::Document d;
+    d.SetObject();
 
-    return JSONNode(JSON_ARRAY);
+    if (it != msg_.MemberEnd())
+        d.AddMember(it->name, it->value, d.GetAllocator());
+
+    return d;
 }
 
-bool Message::is_valid(JSONNode& param)
+bool Message::is_valid(const rapidjson::Document& param)
 {
     if (!validate_params_)
         return true;
 
-    for(JSONNode::iterator it(param.begin()); it != param.end(); ++it)
+    for(auto it(param.MemberBegin()); it != param.MemberEnd(); ++it)
     {
-        if (!is_valid(*it))
+        rapidjson::Value v(*it);
+        if (!is_valid())
             return false;
 
         std::string lowercased(it->name());
@@ -227,7 +229,10 @@ bool Message::is_valid(JSONNode& param)
 
 std::string Message::as_string() const
 {
-    return msg_.write();
+    std::string s;
+    rapidjson::Writer<std::string> w(s);
+    msg_.Accept(w);
+    return s;
 }
 
 JSONNode& Message::as_json()
