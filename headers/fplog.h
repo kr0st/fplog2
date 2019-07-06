@@ -266,7 +266,7 @@ class FPLOG_API Message
             return valid;
         }
 
-        bool is_valid(const rapidjson::Document& param);
+        bool is_valid(rapidjson::Document& param);
 
         template <typename T> Message& add(const char* param_name, T param)
         {

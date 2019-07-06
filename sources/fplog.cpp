@@ -201,18 +201,20 @@ rapidjson::Document Message::get_batch()
     return d;
 }
 
-bool Message::is_valid(const rapidjson::Document& param)
+bool Message::is_valid(rapidjson::Document& param)
 {
     if (!validate_params_)
         return true;
 
     for(auto it(param.MemberBegin()); it != param.MemberEnd(); ++it)
     {
-        rapidjson::Value v(*it);
-        if (!is_valid())
+        rapidjson::Document d;
+        d.AddMember(it->name, it->value, d.GetAllocator());
+
+        if (!is_valid(d))
             return false;
 
-        std::string lowercased(it->name());
+        std::string lowercased(it->name.GetString());
         generic_util::trim(lowercased);
         std::transform(lowercased.begin(), lowercased.end(), lowercased.begin(), ::tolower);
 
@@ -235,20 +237,19 @@ std::string Message::as_string() const
     return s;
 }
 
-JSONNode& Message::as_json()
+rapidjson::Document& Message::as_json()
 {
     return msg_;
 }
 
-Message::Message(const JSONNode& msg)
+Message::Message(const rapidjson::Document& msg)
 {
-    msg_ = msg;
+    msg_.CopyFrom(msg, msg_.GetAllocator());
 }
 
 Message::Message(const std::string& msg)
 {
-    JSONNode json(libjson::parse(msg));
-    msg_ = json;
+    msg_.Parse(msg.c_str());
 }
 
 bool Priority_Filter::should_pass(const Message& msg)
@@ -377,23 +378,28 @@ Message& Message::add_binary(const char* param_name, const void* buf, size_t buf
     if (!param_name || !buf || !buf_size_bytes)
         return *this;
 
-    JSONNode blob(JSON_NODE);
-    blob.set_name(param_name);
+    rapidjson::Document d;
+    rapidjson::Document value;
+
+    d.SetObject();
+    value.SetObject();
 
     size_t dest_len = generic_util::base64_encoded_length(buf_size_bytes);
     char* base64 = new char [dest_len + 1];
     memset(base64, 0, dest_len + 1);
     generic_util::base64_encode(buf, buf_size_bytes, base64, dest_len);
 
-    blob.push_back(JSONNode("blob", base64));
+    value.AddMember(rapidjson::StringRef("blob"), rapidjson::StringRef(base64), value.GetAllocator());
+
+    d.AddMember(rapidjson::StringRef(param_name), value, d.GetAllocator());
 
     delete [] base64;
 
     validate_params_ = false;
-            
+
     try
     {
-        add(blob);
+        add(d);
     }
     catch(std::exception& e)
     {
