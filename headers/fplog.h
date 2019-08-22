@@ -169,8 +169,8 @@ class FPLOG_API Message
         Message& add(const char* param_name, int param){ return add<int>(param_name, param); }
         Message& add(const char* param_name, long long int param){ return add<long long int>(param_name, param); }
         Message& add(const char* param_name, double param){ return add<double>(param_name, param); }
-        Message& add(const char* param_name, std::string& param){ return add<std::string>(param_name, param); }
-        Message& add(const char* param_name, const char* param){ return add<const char*>(param_name, param); }
+        Message& add(const char* param_name, std::string& param);
+        Message& add(const char* param_name, const char* param);
         Message& add_binary(const char* param_name, const void* buf, size_t buf_size_bytes);
 
         //before adding JSON element make sure it has a name
@@ -273,15 +273,16 @@ class FPLOG_API Message
             std::string trimmed(param_name);
             trim(trimmed);
 
-            rapidjson::GenericValue<T> v(param);
+            rapidjson::GenericValue<rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<>> name(trimmed.c_str(), msg_.GetAllocator());
+            rapidjson::GenericValue<rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<>> v(param);
 
             if (param_name && is_valid(trimmed.c_str(), param))
             {
                 auto it(msg_.FindMember(trimmed.c_str()));
                 if (it == msg_.MemberEnd())
-                    msg_.AddMember(trimmed.c_str(), v, msg_.GetAllocator());
+                    msg_.AddMember(name, v, msg_.GetAllocator());
                 else
-                    *it = v;
+                    it->value = v;
             }
 
             return *this;

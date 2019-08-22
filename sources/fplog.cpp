@@ -7,6 +7,7 @@
 #include <udp_transport.h>
 #include <mutex>
 #include <queue_controller.h>
+#include <rapidjson/rapidjson.h>
 #include <rapidjson/allocators.h>
 #include <rapidjson/writer.h>
 
@@ -250,6 +251,46 @@ Message::Message(const rapidjson::Document& msg)
 Message::Message(const std::string& msg)
 {
     msg_.Parse(msg.c_str());
+}
+
+Message& Message::add(const char* param_name, std::string& param)
+{
+    std::string trimmed(param_name);
+    trim(trimmed);
+
+    rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator>> v(param.c_str(), msg_.GetAllocator());
+    rapidjson::GenericValue<rapidjson::UTF8<char>, rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator>> name(trimmed.c_str(), msg_.GetAllocator());
+
+    if (param_name && is_valid(trimmed.c_str(), param))
+    {
+        auto it(msg_.FindMember(trimmed.c_str()));
+        if (it == msg_.MemberEnd())
+            msg_.AddMember(name, v, msg_.GetAllocator());
+        else
+            it->value = v;
+    }
+
+    return *this;
+}
+
+Message& Message::add(const char* param_name, const char* param)
+{
+    std::string trimmed(param_name);
+    trim(trimmed);
+
+    rapidjson::GenericValue<rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<>> v(param, msg_.GetAllocator());
+    rapidjson::GenericValue<rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<>> name(trimmed.c_str(), msg_.GetAllocator());
+
+    if (param_name && is_valid(trimmed.c_str(), param))
+    {
+        auto it(msg_.FindMember(trimmed.c_str()));
+        if (it == msg_.MemberEnd())
+            msg_.AddMember(name, v, msg_.GetAllocator());
+        else
+            it->value = v;
+    }
+
+    return *this;
 }
 
 bool Priority_Filter::should_pass(const Message& msg)
