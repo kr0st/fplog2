@@ -232,10 +232,10 @@ bool Message::is_valid(rapidjson::Document& param)
 
 std::string Message::as_string() const
 {
-    std::string s;
-    rapidjson::Writer<std::string> w(s);
+    rapidjson::StringBuffer s;
+    rapidjson::Writer<rapidjson::StringBuffer> w(s);
     msg_.Accept(w);
-    return s;
+    return s.GetString();
 }
 
 rapidjson::Document& Message::as_json()
@@ -294,7 +294,7 @@ Message& Message::add(const char* param_name, const char* param)
 }
 
 bool Priority_Filter::should_pass(const Message& msg)
-{
+{/*
     Message& m = const_cast<Message&>(msg);
     JSONNode::iterator it(m.as_json().find(fplog::Message::Mandatory_Fields::priority));
     
@@ -305,7 +305,7 @@ bool Priority_Filter::should_pass(const Message& msg)
     {
         //std::cout << "inside prio filter: it->as_string() = " << it->as_string() << std::endl;
         return (prio_.find(it->as_string()) != prio_.end());
-    }
+    }*/
     
     return false;
 }
@@ -561,7 +561,7 @@ class FPLOG_API Fplog_Impl
             }
             else
             {
-                own_transport_ = true;
+                /*own_transport_ = true;
                 transport_ = new spipc::Socket_Transport();
 
                 fplog::Transport_Interface::Params params;
@@ -571,7 +571,7 @@ class FPLOG_API Fplog_Impl
                 transport_->connect(params);
                 protocol_ = new sprot::Protocol(transport_);
 
-                inited_ = true;
+                inited_ = true;*/
             }
         }
 
@@ -606,7 +606,7 @@ class FPLOG_API Fplog_Impl
             if (passed_filters(msg))
             {
                 //std::cout << "message passed filters OK" << std::endl;
-                msg.set_sequence((long long int)sequence_.read());
+                //msg.set_sequence((long long int)sequence_.read());
 
                 if (test_mode_)
                     g_test_results_vector.push_back(strip_timestamp_and_sequence(msg.as_string()));
@@ -702,7 +702,7 @@ class FPLOG_API Fplog_Impl
 
     private:
 
-        Shared_Sequence_Number sequence_;
+        //Shared_Sequence_Number sequence_;
         bool inited_;
         bool own_transport_;
         bool test_mode_;
@@ -947,7 +947,7 @@ FPLOG_API void Fplog_Impl::change_config(const sprot::Params& config)
     mq_.apply_config(config);
 }
 
-#ifdef _LINUX
+#ifdef __linux__
 #include <cxxabi.h>
 
 FPLOG_API ::std::string demangle_cpp_name(const char* mangled)
