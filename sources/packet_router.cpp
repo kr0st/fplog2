@@ -406,12 +406,12 @@ void Packet_Router::waitlist_trace()
 
     char str[255];
 
-    sprintf(str, "Addresses in waitlist: %lu", waitlist_.size());
+    sprintf(str, "Addresses in waitlist: %u", waitlist_.size());
     debug_logging::g_logger.log("waitlist_ trace:");
 
     for (auto it(waitlist_.begin()); it != waitlist_.end(); it++)
     {
-        sprintf(str, "ip = %x; port = %d; requests total (incl. del): %lu", it->first.ip, it->first.port, it->second.size());
+        sprintf(str, "ip = %x; port = %d; requests total (incl. del): %u", it->first.ip, it->first.port, it->second.size());
 
         debug_logging::g_logger.log(str);
 
@@ -424,14 +424,23 @@ void Packet_Router::waitlist_trace()
             }
 
             if ((!(*req)->done) || ((*req)->read_bytes < 2))
-                sprintf(str, "status: %d; length: %lu", (*req)->done, (*req)->read_bytes);
+                sprintf(str, "status: %d; length: %u", (*req)->done, (*req)->read_bytes);
 
             if ((*req)->done && ((*req)->read_bytes >= 2))
             {
-                unsigned short frame_type = *((unsigned short*)&((*req)->read_buffer[2]));
+                unsigned short frame_type = 0;
+
+                if (!(*req)->read_buffer)
+                    frame_type = 0x13 + 6;
+                else
+                {
+                    ((char*)&frame_type)[0] = (*req)->read_buffer[2];
+                    ((char*)&frame_type)[1] = (*req)->read_buffer[3];
+                }
+
                 if (frame_type >= (0x13 + 6))
                     frame_type = 0x13 + 6;
-                sprintf(str, "status: %d; length: %lu; frame type: %s; ip from: %x; port from (listen): %d", (*req)->done, (*req)->read_bytes,
+                sprintf(str, "status: %d; length: %u; frame type: %s; ip from: %x; port from (listen): %d", (*req)->done, (*req)->read_bytes,
                         frame_types[frame_type].c_str(), (*req)->read_ext_data.ip, (*req)->read_ext_data.port);
             }
 

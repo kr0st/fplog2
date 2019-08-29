@@ -14,7 +14,7 @@
 
 #ifdef FPLOG_EXPORT
 
-#ifdef _LINUX
+#ifdef __linux__
 #define FPLOG_API __attribute__ ((visibility("default")))
 #else
 #define FPLOG_API __declspec(dllexport)
@@ -22,7 +22,7 @@
 
 #else
 
-#ifdef _LINUX
+#ifdef __linux__
 #define FPLOG_API 
 #endif
 
@@ -36,7 +36,7 @@
 
 #endif
 
-#ifdef _LINUX
+#ifdef __linux__
 namespace fplog { std::string demangle_cpp_name(const char* mangled); };
 #define CLASSNAME fplog::demangle_cpp_name(typeid(*this).name()).c_str()
 #endif

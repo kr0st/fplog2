@@ -10,6 +10,7 @@
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/allocators.h>
 #include <rapidjson/writer.h>
+#include <stdarg.h>
 
 namespace fplog
 {

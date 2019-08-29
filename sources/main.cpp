@@ -331,7 +331,7 @@ TEST(Udp_Transport_Test, DISABLED_Read_Write_Same_Socket)
     EXPECT_TRUE(generic_util::compare_files("reader1.txt", "writer1.txt"));
 }
 
-TEST(L1_Transport_Test, DISABLED_Smoke_Test)
+TEST(L1_Transport_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -430,7 +430,7 @@ TEST(L1_Transport_Test, DISABLED_Smoke_Test)
 }
 
 
-TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -520,7 +520,7 @@ TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Protocol_Test, DISABLED_Smoke_Test)
+TEST(Protocol_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -581,7 +581,7 @@ TEST(Protocol_Test, DISABLED_Smoke_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, DISABLED_Accept_Unspecified_Connection_Test)
+TEST(Protocol_Test, Accept_Unspecified_Connection_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -714,7 +714,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
-TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
+TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 

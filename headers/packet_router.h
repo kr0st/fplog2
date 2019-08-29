@@ -37,7 +37,7 @@ class Packet_Router: public Extended_Transport_Interface
             Address read_ext_data;
 
             Read_Request(){ read_buffer = new unsigned char[implementation::options.max_frame_size]; }
-            ~Read_Request() { delete [] read_buffer; }
+            ~Read_Request() { delete [] read_buffer; read_buffer = nullptr; }
             Read_Request(const Read_Request& rhs): Read_Request() { operator=(rhs); }
             Read_Request& operator=(const Read_Request& rhs)
             {

@@ -14,7 +14,7 @@
 
 #else
 
-#ifdef _LINUX
+#ifdef __linux__
 #define FPLOG_API 
 #else
 #define FPLOG_API __declspec(dllimport)

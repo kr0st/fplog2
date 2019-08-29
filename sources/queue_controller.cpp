@@ -42,7 +42,7 @@ void Queue_Controller::pop()
     if (!str)
         return;
 
-    #ifdef _LINUX
+    #ifdef __linux__
     int buf_length = static_cast<int>(strnlen(str->c_str(), buf_sz));
     #else
         #ifdef __APPLE__
@@ -60,7 +60,7 @@ void Queue_Controller::push(string *str)
     if (!str)
         return;
 
-    #ifdef _LINUX
+    #ifdef __linux__
     int buf_length = static_cast<int>(strnlen(str->c_str(), buf_sz));
     #else
         #ifdef __APPLE__
@@ -141,7 +141,7 @@ Queue_Controller::Algo::Result Queue_Controller::Remove_Oldest::process_queue(si
 
         if (str)
         {
-            #ifdef _LINUX
+            #ifdef __linux__
             int buf_length = static_cast<int>(strnlen(str->c_str(), buf_sz));
             #else
                 #ifdef __APPLE__
@@ -191,7 +191,7 @@ Queue_Controller::Algo::Result Queue_Controller::Remove_Newest::process_queue(si
 
         if (str)
         {
-            #ifdef _LINUX
+            #ifdef __linux__
             int buf_length = static_cast<int>(strnlen(str->c_str(), buf_sz));
             #else
                 #ifdef __APPLE__
@@ -245,7 +245,7 @@ Queue_Controller::Algo::Result Queue_Controller::Remove_Oldest_Below_Priority::p
         {
             if (cs >= (int)max_size_)
             {
-                #ifdef _LINUX
+                #ifdef __linux__
                 int buf_length = static_cast<int>(strnlen(str->c_str(), buf_sz));
                 #else
                     #ifdef __APPLE__
@@ -322,7 +322,7 @@ Queue_Controller::Algo::Result Queue_Controller::Remove_Newest_Below_Priority::p
 
             if (cs >= (int)max_size_)
             {
-                #ifdef _LINUX
+                #ifdef __linux__
                 int buf_length = static_cast<int>(strnlen(str->c_str(), buf_sz));
                 #else
                     #ifdef __APPLE__
