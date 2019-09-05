@@ -36,19 +36,21 @@ void Packet_Router::waste_management_thread(Packet_Router* p)
 
                     unsigned int requests = 0;
 
-                    auto q = q_iter->second;
-                    auto req_iter = q.begin();
+                    auto q = &q_iter->second;
+                    auto req_iter = q->begin();
 
                     //dumb, fast and easy approach - just cut N latest requests that are over max_requests option
                     //could be updated to something smarter if needed
-                    while (req_iter != q.end())
+                    while (req_iter != q->end())
                     {
                         requests++;
                         if (requests > sprot::implementation::options.max_requests_in_queue)
                         {
                             delete *req_iter;
-                            q.erase(req_iter);
-                            req_iter = q.begin();
+                            *req_iter = nullptr;
+
+                            q->erase(req_iter);
+                            req_iter = q->begin();
                             requests--;
                         }
                         else
@@ -64,18 +66,26 @@ void Packet_Router::waste_management_thread(Packet_Router* p)
             if (connections > sprot::implementation::options.max_connections)
             {
                 for (auto it = p->waitlist_.begin(); it != p->waitlist_.end(); ++it)
+                {
                     for (auto jit = it->second.begin(); jit != it->second.end(); ++jit)
+                    {
                         delete *jit;
+                        *jit = nullptr;
+                    }
+
+                    it->second.clear();
+                }
 
                 {
+                    p->waitlist_.clear();
                     std::map<Address, std::vector<Read_Request*>> empty;
                     p->waitlist_.swap(empty);
                 }
             }
-        }
 
-        debug_logging::g_logger.log("=== after GC cycle ===");
-        p->waitlist_trace();
+            debug_logging::g_logger.log("=== after GC cycle ===");
+            p->waitlist_trace();
+        }
     }
 }
 
@@ -247,9 +257,9 @@ garbage_collector_(std::bind(Packet_Router::waste_management_thread, this))
 
 Packet_Router::Read_Request Packet_Router::schedule_read(Address& user_data, size_t timeout)
 {   
-    Read_Request* req;
+    Read_Request* req = nullptr;
     size_t req_num;
-    std::vector<Read_Request*>* queue;
+    std::vector<Read_Request*>* queue = nullptr;
 
     Address tuple(user_data);
 
@@ -406,12 +416,12 @@ void Packet_Router::waitlist_trace()
 
     char str[255];
 
-    sprintf(str, "Addresses in waitlist: %u", waitlist_.size());
+    sprintf(str, "Addresses in waitlist: %lu", waitlist_.size());
     debug_logging::g_logger.log("waitlist_ trace:");
 
     for (auto it(waitlist_.begin()); it != waitlist_.end(); it++)
     {
-        sprintf(str, "ip = %x; port = %d; requests total (incl. del): %u", it->first.ip, it->first.port, it->second.size());
+        sprintf(str, "ip = %x; port = %d; requests total (incl. del): %lu", it->first.ip, it->first.port, it->second.size());
 
         debug_logging::g_logger.log(str);
 
@@ -424,7 +434,7 @@ void Packet_Router::waitlist_trace()
             }
 
             if ((!(*req)->done) || ((*req)->read_bytes < 2))
-                sprintf(str, "status: %d; length: %u", (*req)->done, (*req)->read_bytes);
+                sprintf(str, "status: %d; length: %lu", (*req)->done, (*req)->read_bytes);
 
             if ((*req)->done && ((*req)->read_bytes >= 2))
             {
@@ -440,7 +450,7 @@ void Packet_Router::waitlist_trace()
 
                 if (frame_type >= (0x13 + 6))
                     frame_type = 0x13 + 6;
-                sprintf(str, "status: %d; length: %u; frame type: %s; ip from: %x; port from (listen): %d", (*req)->done, (*req)->read_bytes,
+                sprintf(str, "status: %d; length: %lu; frame type: %s; ip from: %x; port from (listen): %d", (*req)->done, (*req)->read_bytes,
                         frame_types[frame_type].c_str(), (*req)->read_ext_data.ip, (*req)->read_ext_data.port);
             }
 
