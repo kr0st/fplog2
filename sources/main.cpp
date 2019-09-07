@@ -191,7 +191,7 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
     return bytes_read;
 }
 
-TEST(Udp_Transport_Test, DISABLED_Smoke_Test)
+TEST(Udp_Transport_Test, Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -232,7 +232,7 @@ TEST(Udp_Transport_Test, DISABLED_Smoke_Test)
     EXPECT_EQ(memcmp(message, recv_buf, strlen(message)), 0);
 }
 
-TEST(Udp_Transport_Test, DISABLED_Read_Write_1x1)
+TEST(Udp_Transport_Test, Read_Write_1x1)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -283,7 +283,7 @@ TEST(Udp_Transport_Test, DISABLED_Read_Write_1x1)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Udp_Transport_Test, DISABLED_Read_Write_Same_Socket)
+TEST(Udp_Transport_Test, Read_Write_Same_Socket)
 {
     sprot::Udp_Transport t1;
 
@@ -395,7 +395,7 @@ TEST(L1_Transport_Test, Smoke_Test)
             r2.write(send_buf, strlen(message) + sizeof (frame.bytes), recepient);
     });
 
-    size_t received_bytes = r1.read(recv_buf, sizeof (recv_buf), origin);
+    size_t received_bytes = r1.read(recv_buf, sizeof (recv_buf), unknown_origin);
 
     frame.details.crc = crc;
 
@@ -410,7 +410,7 @@ TEST(L1_Transport_Test, Smoke_Test)
 
     memset(recv_buf, 0, sizeof(recv_buf));
 
-    received_bytes = r1.read(recv_buf, sizeof (recv_buf), unknown_origin);
+    received_bytes = r1.read(recv_buf, sizeof (recv_buf), origin);
 
     sending = false;
 
