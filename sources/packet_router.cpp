@@ -443,10 +443,7 @@ void Packet_Router::waitlist_trace()
                 if (!(*req)->read_buffer)
                     frame_type = 0x13 + 6;
                 else
-                {
-                    ((char*)&frame_type)[0] = (*req)->read_buffer[2];
-                    ((char*)&frame_type)[1] = (*req)->read_buffer[3];
-                }
+                    frame_type = (*req)->read_buffer[2] + (*req)->read_buffer[3] * 256;
 
                 if (frame_type >= (0x13 + 6))
                     frame_type = 0x13 + 6;
