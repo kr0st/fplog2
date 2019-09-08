@@ -295,19 +295,13 @@ Message& Message::add(const char* param_name, const char* param)
 }
 
 bool Priority_Filter::should_pass(const Message& msg)
-{/*
+{
     Message& m = const_cast<Message&>(msg);
-    JSONNode::iterator it(m.as_json().find(fplog::Message::Mandatory_Fields::priority));
-    
-    //std::cout << "filter prios #" << prio_.size() << std::endl;
-    //std::cout << "filter prios numeric #" << prio_numeric_.size() << std::endl;
-    
-    if (it != m.as_json().end())
-    {
-        //std::cout << "inside prio filter: it->as_string() = " << it->as_string() << std::endl;
-        return (prio_.find(it->as_string()) != prio_.end());
-    }*/
-    
+    auto it(m.as_json().FindMember(fplog::Message::Mandatory_Fields::priority));
+
+    if (it != m.as_json().MemberEnd())
+        return (prio_.find(it->value.GetString()) != prio_.end());
+
     return false;
 }
 

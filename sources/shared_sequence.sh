@@ -12,7 +12,7 @@ if [ ! -p /tmp/fplog2_shared_sequence ]; then
     mkfifo /tmp/fplog2_shared_sequence
 fi
 
-shared_sequence=0
+shared_sequence=1
 
 while true; do
     ((shared_sequence++))

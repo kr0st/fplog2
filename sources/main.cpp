@@ -13,6 +13,7 @@
 #include <random>
 #include <vector>
 #include <protocol.h>
+#include <piped_sequence.h>
 
 void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
 {
@@ -191,7 +192,7 @@ unsigned long read_from_transport(unsigned int bytes_to_read, std::string file_n
     return bytes_read;
 }
 
-TEST(Udp_Transport_Test, Smoke_Test)
+TEST(Udp_Transport_Test, DISABLED_Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -232,7 +233,7 @@ TEST(Udp_Transport_Test, Smoke_Test)
     EXPECT_EQ(memcmp(message, recv_buf, strlen(message)), 0);
 }
 
-TEST(Udp_Transport_Test, Read_Write_1x1)
+TEST(Udp_Transport_Test, DISABLED_Read_Write_1x1)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -283,7 +284,7 @@ TEST(Udp_Transport_Test, Read_Write_1x1)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Udp_Transport_Test, Read_Write_Same_Socket)
+TEST(Udp_Transport_Test, DISABLED_Read_Write_Same_Socket)
 {
     sprot::Udp_Transport t1;
 
@@ -331,7 +332,7 @@ TEST(Udp_Transport_Test, Read_Write_Same_Socket)
     EXPECT_TRUE(generic_util::compare_files("reader1.txt", "writer1.txt"));
 }
 
-TEST(L1_Transport_Test, Smoke_Test)
+TEST(L1_Transport_Test, DISABLED_Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -430,7 +431,7 @@ TEST(L1_Transport_Test, Smoke_Test)
 }
 
 
-TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
+TEST(L1_Transport_Test, DISABLED_Multithreaded_Read_Write_3x3)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -520,7 +521,7 @@ TEST(L1_Transport_Test, Multithreaded_Read_Write_3x3)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Protocol_Test, Smoke_Test)
+TEST(Protocol_Test, DISABLED_Smoke_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -581,7 +582,7 @@ TEST(Protocol_Test, Smoke_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, Accept_Unspecified_Connection_Test)
+TEST(Protocol_Test, DISABLED_Accept_Unspecified_Connection_Test)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -647,7 +648,7 @@ TEST(Protocol_Test, Accept_Unspecified_Connection_Test)
     reader.join();
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_No_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -714,7 +715,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_No_Simulated_Errors)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
-TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
+TEST(Protocol_Test, DISABLED_Multithreaded_Read_Write_1x1_Simulated_Errors)
 {
     sprot::Udp_Transport t1, t2;
 
@@ -780,7 +781,7 @@ TEST(Protocol_Test, Multithreaded_Read_Write_1x1_Simulated_Errors)
     EXPECT_TRUE(generic_util::compare_files("reader1.txt", "writer1.txt"));
 }
 
-TEST(Map_Test, Map_As_Key)
+TEST(Map_Test, DISABLED_Map_As_Key)
 {
     sprot::Params params;
 
@@ -810,7 +811,7 @@ TEST(Map_Test, Map_As_Key)
     EXPECT_EQ(test_map[params], 28);
 }
 
-TEST(Options_Test, Load_From_Params)
+TEST(Options_Test, DISABLED_Load_From_Params)
 {
     //storing current options
     sprot::implementation::Options saved(sprot::implementation::options);
@@ -857,7 +858,7 @@ TEST(Options_Test, Load_From_Params)
     EXPECT_EQ(sprot::implementation::options.max_retries, 20);
 }
 
-TEST(Sessions_Test, Connect_Accept_Read_Write)
+TEST(Sessions_Test, DISABLED_Connect_Accept_Read_Write)
 {
     sprot::Session_Manager mgr;
 
@@ -913,7 +914,7 @@ TEST(Sessions_Test, Connect_Accept_Read_Write)
     EXPECT_TRUE(generic_util::compare_files("reader2.txt", "writer2.txt"));
 }
 
-TEST(Sessions_Test, Large_Transfer)
+TEST(Sessions_Test, DISABLED_Large_Transfer)
 {
     sprot::Session_Manager mgr;
 
@@ -1011,6 +1012,12 @@ TEST(Sessions_Test, Large_Transfer)
 
     //checking if sent data matches received data, there should be no differences
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
+}
+
+TEST(Piped_Sequence, Get_Sequence_Number)
+{
+    while (true)
+        std::cout << read_sequence_number() << ", " << read_sequence_number() << ", " << read_sequence_number() << "\n";
 }
 
 int main(int argc, char **argv)
