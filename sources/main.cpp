@@ -1016,6 +1016,7 @@ TEST(Sessions_Test, DISABLED_Large_Transfer)
 
 TEST(Piped_Sequence, Get_Sequence_Number)
 {
+    using namespace sequence_number;
     while (true)
         std::cout << read_sequence_number() << ", " << read_sequence_number() << ", " << read_sequence_number() << "\n";
 }

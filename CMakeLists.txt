@@ -20,7 +20,8 @@ add_executable(${PROJECT_NAME} "sources/main.cpp"
 "sources/queue_controller.cpp"
 "sources/fplog.cpp"
 "sources/session.cpp"
-"sources/piped_sequence.cpp")
+"sources/piped_sequence.cpp"
+"sources/sem_timedwait.cpp")
 
 target_link_libraries(${PROJECT_NAME} libgtest.a
     pthread)

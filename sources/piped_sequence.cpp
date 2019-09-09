@@ -1,12 +1,21 @@
 #include <piped_sequence.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <chrono>
 #include <thread>
+
+namespace sequence_number {
 
 unsigned long long read_sequence_number(size_t timeout)
 {
     unsigned long long sequence = 0, reversed_sequence = 0;
+
+    sem_t* sem = sem_open(sequence_sem_name, O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO, 1);
+
+    if (SEM_FAILED == sem)
+        return 0;
+
+    Sem_Lock sem_lock(sem);
+    sem_lock.try_lock(static_cast<long>(timeout));
 
     auto timer_start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
     auto timer_stop_ms = timer_start_ms;
@@ -52,3 +61,5 @@ unsigned long long read_sequence_number(size_t timeout)
 
     return sequence;
 }
+
+};
