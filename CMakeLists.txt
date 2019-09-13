@@ -25,3 +25,5 @@ add_executable(${PROJECT_NAME} "sources/main.cpp"
 
 target_link_libraries(${PROJECT_NAME} libgtest.a
     pthread)
+
+configure_file(sources/shared_sequence.sh shared_sequence.sh COPYONLY)

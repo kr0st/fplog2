@@ -15,6 +15,10 @@ fi
 shared_sequence=1
 
 while true; do
+    if [ -f /tmp/fplog2_sequence_stop ]; then
+        echo "fplog2 sequence numbers generation stopped."
+        exit 1
+    fi
     ((shared_sequence++))
     printf "0: %.16x" $shared_sequence | xxd -r -g0 -l 8 >> /tmp/fplog2_shared_sequence
 done

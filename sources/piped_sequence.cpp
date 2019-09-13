@@ -14,19 +14,19 @@ unsigned long long read_sequence_number(size_t timeout)
     if (SEM_FAILED == sem)
         return 0;
 
-    Sem_Lock sem_lock(sem);
-    sem_lock.try_lock(static_cast<long>(timeout));
-
     auto timer_start_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
     auto timer_stop_ms = timer_start_ms;
 
     std::chrono::milliseconds timeout_ms(timeout);
 
+    Sem_Lock sem_lock(sem);
+    sem_lock.try_lock(static_cast<long>(timeout));
+
     int pipe = -1;
 
     do
     {
-        pipe = open(sequence_pipe_name, O_RDONLY);
+        pipe = open(sequence_pipe_name, O_RDWR);
 
         if (pipe != -1)
             break;
@@ -39,9 +39,24 @@ unsigned long long read_sequence_number(size_t timeout)
     if (pipe == -1)
         return 0;
 
+    fd_set set;
+    struct timeval select_to;
+    int rv = -1;
+
+    select_to.tv_sec = 0;
+    select_to.tv_usec = 10000;
+
     do
     {
-        read(pipe, &reversed_sequence, sizeof(sequence));
+        FD_ZERO(&set); /* clear the set */
+        FD_SET(pipe, &set); /* add our file descriptor to the set */
+
+        rv = select(pipe + 1, &set, nullptr, nullptr, &select_to);
+
+        if (rv <= 0)
+            reversed_sequence = 0;
+        else
+            read(pipe, &reversed_sequence, sizeof(sequence));
 
         char* p_seq = reinterpret_cast<char*>(&sequence);
         char* p_rev_seq = reinterpret_cast<char*>(&reversed_sequence);

@@ -14,6 +14,7 @@
 #include <vector>
 #include <protocol.h>
 #include <piped_sequence.h>
+#include <stdlib.h>
 
 void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
 {
@@ -1017,17 +1018,30 @@ TEST(Sessions_Test, DISABLED_Large_Transfer)
 TEST(Piped_Sequence, Get_Sequence_Number)
 {
     using namespace sequence_number;
-    while (true)
-        std::cout << read_sequence_number() << ", " << read_sequence_number() << ", " << read_sequence_number() << "\n";
+
+    unsigned long long s1 = read_sequence_number();
+    unsigned long long s2 = read_sequence_number();
+    unsigned long long s3 = read_sequence_number();
+
+    EXPECT_GT(s1, 0);
+    EXPECT_GT(s2, s1);
+    EXPECT_GT(s3, s2);
 }
 
 int main(int argc, char **argv)
 {
+    system("rm /tmp/fplog2_sequence_stop");
+    system("./shared_sequence.sh&");
+
     debug_logging::g_logger.open("fplog2-test-log.txt");
 
     ::testing::InitGoogleTest(&argc, argv);
 
     int res = RUN_ALL_TESTS();
+
+    system("touch /tmp/fplog2_sequence_stop");
+    sequence_number::read_sequence_number(1000);
+    system("rm /tmp/fplog2_sequence_stop");
 
     return res;
 }
