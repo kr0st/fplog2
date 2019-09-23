@@ -37,11 +37,7 @@ class Sem_Lock
 };
 
 static const char* sequence_pipe_name = "/tmp/fplog2_shared_sequence";
-#ifdef __arm__
 static const char* sequence_sem_name = "/fp2_shm_sem";
-#else
-static const char* sequence_sem_name = "/tmp/fp2_shm_sem";
-#endif
 
 unsigned long long read_sequence_number(size_t timeout = 5000);
 
