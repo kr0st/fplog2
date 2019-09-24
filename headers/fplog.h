@@ -365,7 +365,8 @@ class FPLOG_API Priority_Filter: public Filter_Base
 //This process is faster than sync logging but it also means that if app crashes with some messages still
 //in the queue, those messages are lost. If you need to debug some app crash, set this parameter to false
 //until you find the reason for the crash.
-FPLOG_API void initlog(const char* appname, const char* uid, sprot::Basic_Transport_Interface* transport = 0, bool async_logging = true);
+FPLOG_API void initlog(const char* appname, sprot::Basic_Transport_Interface* transport, bool async_logging = true);
+FPLOG_API void initlog(const char* appname, sprot::Address local, sprot::Address remote, bool async_logging = true);
 
 //One time per application call to stop logging from an application and free all associated resources.
 FPLOG_API void shutdownlog();

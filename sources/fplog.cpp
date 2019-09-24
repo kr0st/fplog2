@@ -11,6 +11,7 @@
 #include <rapidjson/allocators.h>
 #include <rapidjson/writer.h>
 #include <stdarg.h>
+#include <piped_sequence.h>
 
 namespace fplog
 {
@@ -532,7 +533,7 @@ class FPLOG_API Fplog_Impl
                 add_filter(filter);
         }
 
-        void initlog(const char* appname, const char* uid, sprot::Basic_Transport_Interface* transport, bool async_logging)
+        void initlog(const char* appname, sprot::Basic_Transport_Interface* transport, bool async_logging)
         {
             std::lock_guard<std::recursive_mutex> lock(mutex_);
 
@@ -601,7 +602,7 @@ class FPLOG_API Fplog_Impl
             if (passed_filters(msg))
             {
                 //std::cout << "message passed filters OK" << std::endl;
-                //msg.set_sequence((long long int)sequence_.read());
+                msg.set_sequence(sequence_number::read_sequence_number());
 
                 if (test_mode_)
                     g_test_results_vector.push_back(strip_timestamp_and_sequence(msg.as_string()));
