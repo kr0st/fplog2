@@ -12,6 +12,7 @@
 #include <rapidjson/writer.h>
 #include <stdarg.h>
 #include <piped_sequence.h>
+#include <fplog_exceptions.h>
 
 namespace fplog
 {
@@ -557,17 +558,7 @@ class FPLOG_API Fplog_Impl
             }
             else
             {
-                /*own_transport_ = true;
-                transport_ = new spipc::Socket_Transport();
-
-                fplog::Transport_Interface::Params params;
-                params["uid"] = uid;
-                params["ip"] = "127.0.0.1";
-
-                transport_->connect(params);
-                protocol_ = new sprot::Protocol(transport_);
-
-                inited_ = true;*/
+                THROW(fplog::exceptions::Transport_Missing);
             }
         }
 
@@ -818,14 +809,14 @@ void write(const Message& msg)
     g_fplog_impl->write(msg);
 }
 
-void initlog(const char* appname, const char* uid, sprot::Basic_Transport_Interface* transport, bool async_logging)
+void initlog(const char* appname, sprot::Basic_Transport_Interface* transport, bool async_logging)
 {
     std::lock_guard<std::recursive_mutex> lock(g_api_mutex);
 
     if (!g_fplog_impl)
         g_fplog_impl = new Fplog_Impl();
 
-    return g_fplog_impl->initlog(appname, uid, transport, async_logging);
+    return g_fplog_impl->initlog(appname, transport, async_logging);
 }
 
 void shutdownlog()

@@ -15,6 +15,7 @@
 #include <protocol.h>
 #include <piped_sequence.h>
 #include <stdlib.h>
+#include <fplog.h>
 
 void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
 {
@@ -1028,6 +1029,19 @@ TEST(Piped_Sequence, Get_Sequence_Number)
     EXPECT_GT(s3, s2);
 }
 
+TEST(Fplog_Api, Trim_And_Blob)
+{
+    fplog::openlog(fplog::Facility::security, new fplog::Priority_Filter("prio_filter"));
+
+    int var = -533;
+    int var2 = 54674;
+    fplog::write(fplog::Message(fplog::Prio::alert, fplog::Facility::system, "go fetch some numbers").
+                 add("blob", 66).add("int", 23).add_binary("int_bin", &var, sizeof(int)).
+                 add_binary("int_bin", &var2, sizeof(int)).add("    Double ", -1.23).add("encrypted", "sfewre"));
+
+   fplog::closelog();
+}
+
 int main(int argc, char **argv)
 {
     system("rm /tmp/fplog2_sequence_stop");
@@ -1035,9 +1049,61 @@ int main(int argc, char **argv)
 
     debug_logging::g_logger.open("fplog2-test-log.txt");
 
+    sprot::Session_Manager mgr;
+
+    sprot::Params params;
+    sprot::Param p;
+
+    //configuring local transport for session s1
+    //we will open UDP socket on 127.0.0.1 and port 26260
+    //it will be used both for accepting connections and reading/writing data
+
+    p.first = "ip";
+    p.second = "127.0.0.1";
+    params.insert(p);
+
+    p.first = "port";
+    p.second = "26360";
+    params.insert(p);
+
+    params["hostname"] = "WORKSTATION-666";
+
+    bool stop = false;
+
+    //launching accept connection and receiving data in a separate thread
+    std::thread reader1([&]{
+        sprot::Address remote;
+        remote.ip = 0x0100007f; //accepting connection only from IP = 127.0.0.1
+        remote.port = 26361; //and port = 26361 combination
+
+        std::shared_ptr<sprot::Session> s1(mgr.accept(params, remote, 1500));
+        while (!stop)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    params["port"] = "26361"; //this is the local port of the sending socket for session s2
+    //when a session is created, it is associated with a local socket
+    //that is being created at the same time with the session or reused if
+    //there already is a socket of the same IP/Port combination inside
+    //the Session_Manager internals
+
+    sprot::Address remote;
+    remote.ip = 0x0100007f;//connecting to IP = 127.0.0.1
+    remote.port = 26360;//on port = 26360
+
+    //connecting to the session s1 that is already listening and waiting to accept connection
+    std::unique_ptr<sprot::Session> s2(mgr.connect(params, remote, 1500));
+
+    fplog::initlog("fplog_test", s2.get(), true);
+
     ::testing::InitGoogleTest(&argc, argv);
 
     int res = RUN_ALL_TESTS();
+
+    stop = true;
+    reader1.join();
 
     system("touch /tmp/fplog2_sequence_stop");
     sequence_number::read_sequence_number(1000);
