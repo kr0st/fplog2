@@ -212,7 +212,9 @@ class FPLOG_API Message
 
             try
             {
-                msg = add(param_name, param);
+                Message& returned(add(param_name, param));
+                if (&msg != &returned)
+                    msg = returned;
             }
             catch(std::exception& e)
             {

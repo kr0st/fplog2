@@ -60,6 +60,8 @@ const char* Message::Optional_Fields::batch = "batch"; //indicator if this messa
 Message::Message(const char* prio, const char *facility, const char* format, ...):
 msg_()
 {
+    msg_.SetObject();
+
     set_timestamp();
     set(Mandatory_Fields::priority, prio ? prio : Prio::debug);
     set(Mandatory_Fields::facility, facility ? facility : Facility::user);
@@ -509,7 +511,6 @@ class FPLOG_API Fplog_Impl
             std::lock_guard<std::recursive_mutex> lock(mutex_);
 
             delete mq_reader_;
-            delete protocol_;
 
             if (inited_ && own_transport_)
                 delete transport_;
@@ -613,7 +614,7 @@ class FPLOG_API Fplog_Impl
                             {
                                 //std::cout << "preparing to write message directly" << std::endl;
                                 std::string str(msg.as_string());
-                                protocol_->write(str.c_str(), str.size(), 400);
+                                transport_->write(str.c_str(), str.size(), 400);
                                 break;
                             }
                             catch(fplog::exceptions::Generic_Exception& e)
@@ -715,7 +716,6 @@ class FPLOG_API Fplog_Impl
         std::recursive_mutex mq_reader_mutex_;
 
         sprot::Basic_Transport_Interface* transport_;
-        sprot::Basic_Transport_Interface* protocol_;
 
         void stop_reading_queue()
         {
@@ -752,7 +752,7 @@ class FPLOG_API Fplog_Impl
                 try
                 {
                     if (str)
-                        protocol_->write(str->c_str(), str->size(), 400);
+                        transport_->write(str->c_str(), str->size(), 400);
                     else
                     {
                         if (stopping_)

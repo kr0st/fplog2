@@ -1016,7 +1016,7 @@ TEST(Sessions_Test, DISABLED_Large_Transfer)
     EXPECT_TRUE(generic_util::compare_files("reader3.txt", "writer3.txt"));
 }
 
-TEST(Piped_Sequence, Get_Sequence_Number)
+TEST(Piped_Sequence, DISABLED_Get_Sequence_Number)
 {
     using namespace sequence_number;
 
@@ -1033,6 +1033,11 @@ TEST(Fplog_Api, Trim_And_Blob)
 {
     fplog::openlog(fplog::Facility::security, new fplog::Priority_Filter("prio_filter"));
 
+    fplog::Priority_Filter* f = dynamic_cast<fplog::Priority_Filter*>(fplog::find_filter("prio_filter"));
+    EXPECT_NE(f, nullptr);
+
+    f->add_all_above("debug", true);
+
     int var = -533;
     int var2 = 54674;
     fplog::write(fplog::Message(fplog::Prio::alert, fplog::Facility::system, "go fetch some numbers").
@@ -1045,7 +1050,7 @@ TEST(Fplog_Api, Trim_And_Blob)
 int main(int argc, char **argv)
 {
     system("rm /tmp/fplog2_sequence_stop");
-    system("./shared_sequence.sh&");
+    //system("./shared_sequence.sh&");
 
     debug_logging::g_logger.open("fplog2-test-log.txt");
 
@@ -1077,8 +1082,24 @@ int main(int argc, char **argv)
         remote.port = 26361; //and port = 26361 combination
 
         std::shared_ptr<sprot::Session> s1(mgr.accept(params, remote, 1500));
+        std::shared_ptr<char> buf(new char [sprot::implementation::options.mtu]);
+
         while (!stop)
+        {
+            memset(buf.get(), 0, sprot::implementation::options.mtu);
+
+            try
+            {
+                s1->read(buf.get(), sprot::implementation::options.mtu, 400);
+                std::cout << buf.get() << "\n";
+            }
+            catch (...)
+            {
+                continue;
+            }
+
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
