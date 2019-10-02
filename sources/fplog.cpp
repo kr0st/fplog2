@@ -429,7 +429,10 @@ Message& Message::add_binary(const char* param_name, const void* buf, size_t buf
     memset(base64, 0, dest_len + 1);
     generic_util::base64_encode(buf, buf_size_bytes, base64, dest_len);
 
-    value.AddMember(rapidjson::StringRef("blob"), rapidjson::StringRef(base64), value.GetAllocator());
+    rapidjson::Value real_value;
+    real_value.SetString(base64, static_cast<unsigned int>(strlen(base64)), value.GetAllocator());
+
+    value.AddMember(rapidjson::StringRef("blob"), real_value, value.GetAllocator());
 
     d.AddMember(rapidjson::StringRef(param_name), value, d.GetAllocator());
 
