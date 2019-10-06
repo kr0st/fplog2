@@ -36,7 +36,7 @@
 
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 namespace fplog { std::string demangle_cpp_name(const char* mangled); };
 #define CLASSNAME fplog::demangle_cpp_name(typeid(*this).name()).c_str()
 #endif

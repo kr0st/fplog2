@@ -18,6 +18,29 @@
 #include <fplog.h>
 #include <queue_controller.h>
 
+namespace fplog {
+
+class FPLOG_API Fplog_Impl
+{
+    public:
+
+        void set_test_mode(bool mode);
+        void wait_until_queues_are_empty();
+};
+
+FPLOG_API extern Fplog_Impl* g_fplog_impl;
+FPLOG_API extern std::vector<std::string> g_test_results_vector;
+
+};
+
+void print_test_vector()
+{
+    for (auto str : fplog::g_test_results_vector)
+    {
+        std::cout << str << std::endl;
+    }
+}
+
 void randomize_buffer(unsigned char* buf, size_t len, std::mt19937* rng)
 {
     std::uniform_int_distribution<unsigned char> range(97, 122); //ascii 'a' to 'z'
@@ -1030,14 +1053,53 @@ TEST(Piped_Sequence_Test, DISABLED_Get_Sequence_Number)
     EXPECT_GT(s3, s2);
 }
 
-TEST(Fplog_Api_Test, Trim_And_Blob)
+class Bar
 {
+    public:
+        virtual bool FooBar() = 0;
+        virtual ~Bar(){}
+};
+
+class Foo: public Bar
+{
+    public:
+
+        bool FooBar()
+        {
+            fplog::write(FPL_CINFO("blah-blah %d!", 38).add("real", -9.54));
+            return true;
+        }
+};
+
+void prepare_api_test()
+{
+    fplog::g_test_results_vector.clear();
+
     fplog::openlog(fplog::Facility::security, new fplog::Priority_Filter("prio_filter"));
 
     fplog::Priority_Filter* f = dynamic_cast<fplog::Priority_Filter*>(fplog::find_filter("prio_filter"));
     EXPECT_NE(f, nullptr);
 
     f->add_all_above("debug", true);
+}
+
+TEST(Fplog_Api_Test, Method_And_Class_Logging_Test)
+{
+    prepare_api_test();
+
+    Foo k;
+    k.FooBar();
+
+    std::string good("{\"priority\":\"info\",\"facility\":\"security\",\"text\":\"blah-blah 38!\",\"module\":\"main.cpp\",\"line\":1069,\"method\":\"FooBar\",\"class\":\"Foo\",\"real\":-9.54,\"appname\":\"fplog_test\"}");
+
+    EXPECT_EQ(fplog::g_test_results_vector[0], good);
+
+    fplog::closelog();
+}
+
+TEST(Fplog_Api_Test, Trim_And_Blob)
+{
+    prepare_api_test();
 
     int var = -533;
     int var2 = 54674;
@@ -1045,10 +1107,29 @@ TEST(Fplog_Api_Test, Trim_And_Blob)
                  add("blob", 66).add("int", 23).add_binary("int_bin", &var, sizeof(int)).
                  add_binary("int_bin", &var2, sizeof(int)).add("    Double ", -1.23).add("encrypted", "sfewre"));
 
+   std::string good("{\"priority\":\"alert\",\"facility\":\"system\",\"text\":\"go fetch some numbers\",\"warning\":\"Some parameters are missing from this log message because they were malformed.\",\"int\":23,\"int_bin\":{\"blob\":\"ktUAAA==\"},\"Double\":-1.23,\"appname\":\"fplog_test\"}");
+
+   EXPECT_EQ(fplog::g_test_results_vector[0], good);
+
    fplog::closelog();
 }
 
-TEST(Queue_Controller_Test, Remove_Newest)
+TEST(Fplog_Api_Test, Send_File_Test)
+{
+    prepare_api_test();
+
+    const char* str = "asafdkfj *** Hello, world! -=-=-=-=-=-+++   ";
+
+    fplog::write(fplog::File(fplog::Prio::alert, "dump.bin", str, strlen(str)).as_message());
+
+    std::string good("{\"priority\":\"alert\",\"facility\":\"user\",\"file\":\"dump.bin\",\"text\":\"YXNhZmRrZmogKioqIEhlbGxvLCB3b3JsZCEgLT0tPS09LT0tPS0rKysgICA=\",\"appname\":\"fplog_test\"}");
+
+    EXPECT_EQ(fplog::g_test_results_vector[0], good);
+
+    fplog::closelog();
+}
+
+TEST(Queue_Controller_Test, DISABLED_Remove_Newest)
 {
     Queue_Controller qc(200, 3000);
     qc.change_algo(std::make_shared<Queue_Controller::Remove_Newest>(qc), Queue_Controller::Algo::Fallback_Options::Remove_Oldest);
@@ -1110,7 +1191,7 @@ TEST(Queue_Controller_Test, Remove_Newest)
     }
 }
 
-TEST(Queue_Controller_Test, Remove_Oldest)
+TEST(Queue_Controller_Test, DISABLED_Remove_Oldest)
 {
     Queue_Controller qc(200, 3000);
 
@@ -1170,7 +1251,7 @@ TEST(Queue_Controller_Test, Remove_Oldest)
     }
 }
 
-TEST(Queue_Controller_Test, Remove_Newest_Below_Prio)
+TEST(Queue_Controller_Test, DISABLED_Remove_Newest_Below_Prio)
 {
     std::minstd_rand rng;
     rng.seed(21);
@@ -1275,7 +1356,7 @@ TEST(Queue_Controller_Test, Remove_Newest_Below_Prio)
     }
 }
 
-TEST(Queue_Controller_Test, Remove_Oldest_Below_Prio)
+TEST(Queue_Controller_Test, DISABLED_Remove_Oldest_Below_Prio)
 {
     std::minstd_rand rng;
     rng.seed(13);
@@ -1380,7 +1461,8 @@ TEST(Queue_Controller_Test, Remove_Oldest_Below_Prio)
         EXPECT_TRUE(correct_found);
     }
 }
-TEST(Queue_Controller_Test, Apply_Config)
+
+TEST(Queue_Controller_Test, DISABLED_Apply_Config)
 {
     std::minstd_rand rng;
     rng.seed(21);
@@ -1504,7 +1586,7 @@ int main(int argc, char **argv)
 
     debug_logging::g_logger.open("fplog2-test-log.txt");
 
-    sprot::Session_Manager mgr;
+    /*sprot::Session_Manager mgr;
 
     sprot::Params params;
     sprot::Param p;
@@ -1565,16 +1647,26 @@ int main(int argc, char **argv)
     remote.port = 26360;//on port = 26360
 
     //connecting to the session s1 that is already listening and waiting to accept connection
-    std::unique_ptr<sprot::Session> s2(mgr.connect(params, remote, 1500));
+    std::unique_ptr<sprot::Session> s2(mgr.connect(params, remote, 1500));*/
 
-    fplog::initlog("fplog_test", s2.get(), true);
+    try
+    {
+        fplog::initlog("fplog_test", nullptr, false);
+    }
+    catch (fplog::exceptions::Transport_Missing&)
+    {
+    }
+
+    fplog::g_fplog_impl->set_test_mode(true);
 
     ::testing::InitGoogleTest(&argc, argv);
 
     int res = RUN_ALL_TESTS();
 
-    stop = true;
-    reader1.join();
+    print_test_vector();
+
+    //stop = true;
+    //reader1.join();
 
     system("touch /tmp/fplog2_sequence_stop");
     sequence_number::read_sequence_number(1000);
