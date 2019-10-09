@@ -348,7 +348,12 @@ class FPLOG_API Priority_Filter: public Filter_Base
         virtual bool should_pass(const Message& msg);
 
         void add(const char* prio){ if (prio) prio_.insert(prio); }
-        void remove(const char* prio) { if (prio){ std::set<std::string>::iterator it(prio_.find(prio)); if (it != prio_.end()) { prio_.erase(it); }}}
+        void remove(const char* prio = nullptr) //by default removes all
+        {
+            if (prio){ std::set<std::string>::iterator it(prio_.find(prio)); if (it != prio_.end()) { prio_.erase(it); }}
+            else
+                prio_.clear();
+        }
 
         void add_all_above(const char* prio, bool inclusive = false);
         void add_all_below(const char* prio, bool inclusive = false);

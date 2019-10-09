@@ -1083,7 +1083,7 @@ void prepare_api_test()
     f->add_all_above("debug", true);
 }
 
-TEST(Fplog_Api_Test, Method_And_Class_Logging_Test)
+TEST(Fplog_Api_Test, Method_And_Class_Logging)
 {
     prepare_api_test();
 
@@ -1114,7 +1114,7 @@ TEST(Fplog_Api_Test, Trim_And_Blob)
    fplog::closelog();
 }
 
-TEST(Fplog_Api_Test, Send_File_Test)
+TEST(Fplog_Api_Test, Send_File)
 {
     prepare_api_test();
 
@@ -1125,6 +1125,108 @@ TEST(Fplog_Api_Test, Send_File_Test)
     std::string good("{\"priority\":\"alert\",\"facility\":\"user\",\"file\":\"dump.bin\",\"text\":\"YXNhZmRrZmogKioqIEhlbGxvLCB3b3JsZCEgLT0tPS09LT0tPS0rKysgICA=\",\"appname\":\"fplog_test\"}");
 
     EXPECT_EQ(fplog::g_test_results_vector[0], good);
+
+    fplog::closelog();
+}
+
+TEST(Fplog_Api_Test, Filters)
+{
+    prepare_api_test();
+
+    fplog::Priority_Filter* filter = dynamic_cast<fplog::Priority_Filter*>(fplog::find_filter("prio_filter"));
+    if (!filter)
+    {
+        EXPECT_NE(filter, nullptr);
+        return;
+    }
+
+    filter->remove();
+
+    {
+        fplog::Message msg(fplog::Prio::alert, fplog::Facility::system, "this message should not appear");
+        fplog::write(msg);
+    }
+
+    filter->add(fplog::Prio::emergency);
+    filter->add(fplog::Prio::debug);
+
+    {
+        fplog::Message msg(fplog::Prio::alert, fplog::Facility::system, "this message still should not appear");
+        fplog::write(msg);
+    }
+    {
+        fplog::Message msg(fplog::Prio::emergency, fplog::Facility::system, "this emergency message is visible");
+        fplog::write(msg);
+    }
+    {
+        fplog::Message msg(fplog::Prio::debug, fplog::Facility::system, "along with this debug message");
+        fplog::write(msg);
+    }
+
+    filter->remove(fplog::Prio::emergency);
+
+    {
+        fplog::Message msg(fplog::Prio::emergency, fplog::Facility::system, "this is invisible emergency");
+        fplog::write(msg);
+    }
+
+    remove_filter(filter);
+
+    {
+        fplog::Message msg(fplog::Prio::debug, fplog::Facility::system, "this debug message should be invisible");
+        fplog::write(msg);
+    }
+
+    EXPECT_EQ(fplog::g_test_results_vector.size(), 2);
+    EXPECT_EQ("{\"priority\":\"emergency\",\"facility\":\"system\",\"text\":\"this emergency message is visible\",\"appname\":\"fplog_test\"}", fplog::g_test_results_vector[0]);
+    EXPECT_EQ("{\"priority\":\"debug\",\"facility\":\"system\",\"text\":\"along with this debug message\",\"appname\":\"fplog_test\"}", fplog::g_test_results_vector[1]);
+
+    fplog::closelog();
+}
+
+static std::string strip_timestamp_and_sequence(std::string input)
+{
+    generic_util::remove_json_field(fplog::Message::Mandatory_Fields::timestamp, input);
+    generic_util::remove_json_field(fplog::Message::Optional_Fields::sequence, input);
+
+    return input;
+}
+
+TEST(Fplog_Api_Test, Batching)
+{
+    prepare_api_test();
+
+    rapidjson::Document batch;
+    batch.SetArray();
+
+    auto batch_array = batch.GetArray();
+
+    batch_array.PushBack(fplog::Message(fplog::Prio::debug, fplog::Facility::user, "batching test msg #1").as_json(), batch.GetAllocator());
+    batch_array.PushBack(fplog::Message(fplog::Prio::debug, fplog::Facility::user, "batching test msg #2").as_json(), batch.GetAllocator());
+
+    fplog::Message batch_msg(fplog::Prio::debug, fplog::Facility::user);
+    batch_msg.add_batch(batch);
+
+    rapidjson::Document& json_msg(batch_msg.as_json());
+    auto it(json_msg.GetArray().begin());
+
+    fplog::g_test_results_vector.push_back(strip_timestamp_and_sequence(batch_msg.as_string()));
+    int counter = 0;
+
+    ++it;
+    while (it != json_msg.GetArray().end())
+    {
+        fplog::g_test_results_vector.push_back(std::to_string(counter) + ": name=" + it->GetObject().begin()->name.GetString() + ", value=" + it->GetObject().begin()->value.GetString());
+        ++it;
+        counter++;
+    }
+
+    fplog::g_test_results_vector.push_back("msg has batch? = " + std::to_string(batch_msg.has_batch()));
+
+    fplog::Message batch_clone(batch_msg.as_string());
+
+    fplog::g_test_results_vector.push_back("cloned msg: " + strip_timestamp_and_sequence(batch_clone.as_string()));
+    fplog::g_test_results_vector.push_back("clone msg has batch? = " + std::to_string(batch_clone.has_batch()));
 
     fplog::closelog();
 }
