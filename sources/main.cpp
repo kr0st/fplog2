@@ -17,6 +17,9 @@
 #include <stdlib.h>
 #include <fplog.h>
 #include <queue_controller.h>
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 namespace fplog {
 
@@ -1083,7 +1086,7 @@ void prepare_api_test()
     f->add_all_above("debug", true);
 }
 
-TEST(Fplog_Api_Test, Method_And_Class_Logging)
+TEST(Fplog_Api_Test, DISABLED_Method_And_Class_Logging)
 {
     prepare_api_test();
 
@@ -1097,7 +1100,7 @@ TEST(Fplog_Api_Test, Method_And_Class_Logging)
     fplog::closelog();
 }
 
-TEST(Fplog_Api_Test, Trim_And_Blob)
+TEST(Fplog_Api_Test, DISABLED_Trim_And_Blob)
 {
     prepare_api_test();
 
@@ -1114,7 +1117,7 @@ TEST(Fplog_Api_Test, Trim_And_Blob)
    fplog::closelog();
 }
 
-TEST(Fplog_Api_Test, Send_File)
+TEST(Fplog_Api_Test, DISABLED_Send_File)
 {
     prepare_api_test();
 
@@ -1129,7 +1132,7 @@ TEST(Fplog_Api_Test, Send_File)
     fplog::closelog();
 }
 
-TEST(Fplog_Api_Test, Filters)
+TEST(Fplog_Api_Test, DISABLED_Filters)
 {
     prepare_api_test();
 
@@ -1196,27 +1199,57 @@ TEST(Fplog_Api_Test, Batching)
 {
     prepare_api_test();
 
-    rapidjson::Document batch;
+    rapidjson::Document batch, named_batch, m1, m2;
+
     batch.SetArray();
 
     auto batch_array = batch.GetArray();
 
-    batch_array.PushBack(fplog::Message(fplog::Prio::debug, fplog::Facility::user, "batching test msg #1").as_json(), batch.GetAllocator());
-    batch_array.PushBack(fplog::Message(fplog::Prio::debug, fplog::Facility::user, "batching test msg #2").as_json(), batch.GetAllocator());
+    m1.CopyFrom(fplog::Message(fplog::Prio::debug, fplog::Facility::user, "batching test msg #1").as_json(), batch.GetAllocator());
+    m2.CopyFrom(fplog::Message(fplog::Prio::debug, fplog::Facility::user, "batching test msg #2").as_json(), batch.GetAllocator());
+
+    batch_array.PushBack(m1, batch.GetAllocator());
+    batch_array.PushBack(m2, batch.GetAllocator());
 
     fplog::Message batch_msg(fplog::Prio::debug, fplog::Facility::user);
-    batch_msg.add_batch(batch);
 
+    named_batch.SetObject();
+    named_batch.AddMember("batch", batch, named_batch.GetAllocator());
+
+    batch_msg.add_batch(named_batch);
+
+    //cout << batch_msg.as_string();
+
+    cout << "Original batch below:\n";
     rapidjson::Document& json_msg(batch_msg.as_json());
-    auto it(json_msg.GetArray().begin());
+
+    {
+        rapidjson::StringBuffer s;
+        rapidjson::Writer<rapidjson::StringBuffer> w(s);
+        json_msg.Accept(w);
+        cout << s.GetString();
+    }
+
+    //skipping 3 members: timestamp, priority, facility and jumping straight to 4th which is batch array
+    auto it((++++++(json_msg.MemberBegin()))->value.GetArray().begin());
 
     fplog::g_test_results_vector.push_back(strip_timestamp_and_sequence(batch_msg.as_string()));
     int counter = 0;
 
-    ++it;
-    while (it != json_msg.GetArray().end())
+    EXPECT_NE(it, (++++++(json_msg.MemberBegin()))->value.GetArray().end());
+
+    while (it != (++++++(json_msg.MemberBegin()))->value.GetArray().end())
     {
-        fplog::g_test_results_vector.push_back(std::to_string(counter) + ": name=" + it->GetObject().begin()->name.GetString() + ", value=" + it->GetObject().begin()->value.GetString());
+        {
+            rapidjson::Document json;
+            json.SetObject();
+            json.AddMember("", *it, json.GetAllocator());
+            rapidjson::StringBuffer s;
+            rapidjson::Writer<rapidjson::StringBuffer> w(s);
+            json.Accept(w);
+            cout << std::to_string(counter) + ": value=" + s.GetString();
+            fplog::g_test_results_vector.push_back(std::to_string(counter) + ": value=" + s.GetString());
+        }
         ++it;
         counter++;
     }
@@ -1224,6 +1257,16 @@ TEST(Fplog_Api_Test, Batching)
     fplog::g_test_results_vector.push_back("msg has batch? = " + std::to_string(batch_msg.has_batch()));
 
     fplog::Message batch_clone(batch_msg.as_string());
+
+    cout << "\nCloned batch below:\n";
+
+    {
+        auto& json(batch_clone.as_json());
+        rapidjson::StringBuffer s;
+        rapidjson::Writer<rapidjson::StringBuffer> w(s);
+        json.Accept(w);
+        cout << s.GetString();
+    }
 
     fplog::g_test_results_vector.push_back("cloned msg: " + strip_timestamp_and_sequence(batch_clone.as_string()));
     fplog::g_test_results_vector.push_back("clone msg has batch? = " + std::to_string(batch_clone.has_batch()));
