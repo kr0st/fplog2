@@ -1221,7 +1221,7 @@ TEST(Fplog_Api_Test, Batching)
     //cout << batch_msg.as_string();
 
     cout << "Original batch below:\n";
-    rapidjson::Document& json_msg(batch_msg.as_json());
+    rapidjson::Document json_msg(batch_msg.as_json());
 
     {
         rapidjson::StringBuffer s;
@@ -1261,7 +1261,7 @@ TEST(Fplog_Api_Test, Batching)
     cout << "\nCloned batch below:\n";
 
     {
-        auto& json(batch_clone.as_json());
+        auto json(batch_clone.as_json());
         rapidjson::StringBuffer s;
         rapidjson::Writer<rapidjson::StringBuffer> w(s);
         json.Accept(w);

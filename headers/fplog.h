@@ -197,7 +197,7 @@ class FPLOG_API Message
         Message& set_file(const char* name);
 
         std::string as_string() const;
-        rapidjson::Document& as_json();
+        rapidjson::Document as_json();
 
 
     private:

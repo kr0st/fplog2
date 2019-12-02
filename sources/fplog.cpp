@@ -243,9 +243,11 @@ std::string Message::as_string() const
     return s.GetString();
 }
 
-rapidjson::Document& Message::as_json()
+rapidjson::Document Message::as_json()
 {
-    return msg_;
+    rapidjson::Document msg;
+    msg.CopyFrom(msg_, msg.GetAllocator());
+    return msg;
 }
 
 Message::Message(const rapidjson::Document& msg)
