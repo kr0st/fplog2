@@ -1218,17 +1218,7 @@ TEST(Fplog_Api_Test, Batching)
 
     batch_msg.add_batch(named_batch);
 
-    //cout << batch_msg.as_string();
-
-    cout << "Original batch below:\n";
     rapidjson::Document json_msg(batch_msg.as_json());
-
-    {
-        rapidjson::StringBuffer s;
-        rapidjson::Writer<rapidjson::StringBuffer> w(s);
-        json_msg.Accept(w);
-        cout << s.GetString();
-    }
 
     //skipping 3 members: timestamp, priority, facility and jumping straight to 4th which is batch array
     auto it((++++++(json_msg.MemberBegin()))->value.GetArray().begin());
@@ -1243,12 +1233,14 @@ TEST(Fplog_Api_Test, Batching)
         {
             rapidjson::Document json;
             json.SetObject();
-            json.AddMember("", *it, json.GetAllocator());
+
+            rapidjson::GenericValue<rapidjson::UTF8<>, rapidjson::MemoryPoolAllocator<>> name(std::to_string(counter).c_str(), json.GetAllocator());
+
+            json.AddMember(name, *it, json.GetAllocator());
             rapidjson::StringBuffer s;
             rapidjson::Writer<rapidjson::StringBuffer> w(s);
             json.Accept(w);
-            cout << std::to_string(counter) + ": value=" + s.GetString();
-            fplog::g_test_results_vector.push_back(std::to_string(counter) + ": value=" + s.GetString());
+            fplog::g_test_results_vector.push_back(s.GetString());
         }
         ++it;
         counter++;
@@ -1258,18 +1250,15 @@ TEST(Fplog_Api_Test, Batching)
 
     fplog::Message batch_clone(batch_msg.as_string());
 
-    cout << "\nCloned batch below:\n";
-
-    {
-        auto json(batch_clone.as_json());
-        rapidjson::StringBuffer s;
-        rapidjson::Writer<rapidjson::StringBuffer> w(s);
-        json.Accept(w);
-        cout << s.GetString();
-    }
-
     fplog::g_test_results_vector.push_back("cloned msg: " + strip_timestamp_and_sequence(batch_clone.as_string()));
     fplog::g_test_results_vector.push_back("clone msg has batch? = " + std::to_string(batch_clone.has_batch()));
+
+    EXPECT_EQ(fplog::g_test_results_vector[3], "msg has batch? = 1");
+    EXPECT_EQ(fplog::g_test_results_vector[4], "cloned msg: {\"priority\":\"debug\",\"facility\":\"user\",\""
+                                               "batch\":[{\"priority\":\"debug\",\"facility\":\"user\",\"text\":\""
+                                               "batching test msg #1\"},{\"priority\":\"debug\",\"facility\":\"user\","
+                                               "\"text\":\"batching test msg #2\"}]}");
+    EXPECT_EQ(fplog::g_test_results_vector[5], "clone msg has batch? = 1");
 
     fplog::closelog();
 }
@@ -1808,7 +1797,7 @@ int main(int argc, char **argv)
 
     int res = RUN_ALL_TESTS();
 
-    print_test_vector();
+    //print_test_vector();
 
     //stop = true;
     //reader1.join();
