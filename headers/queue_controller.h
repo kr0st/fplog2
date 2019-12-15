@@ -6,7 +6,7 @@
 
 #ifdef FPLOG_EXPORT
 
-#ifdef _LINUX
+#ifdef __linux__
 #define FPLOG_API __attribute__ ((visibility("default")))
 #else
 #define FPLOG_API __declspec(dllexport)
